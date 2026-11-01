@@ -1,0 +1,95 @@
+{% extends 'base.html' %}
+{% block title %}Welcome | AI-Powered Study Planner{% endblock %}
+
+{% block public_content %}
+<div class="min-vh-100 d-flex flex-column justify-content-between">
+    <!-- Top Glass Navbar -->
+    <nav class="container mt-3">
+        <div class="glass-panel px-4 py-3 d-flex justify-content-between align-items-center">
+            <div class="d-flex align-items-center gap-2">
+                <div class="brand-icon-box text-white">
+                    <i class="bi bi-mortarboard-fill fs-5"></i>
+                </div>
+                <span class="fs-4 brand-logo">AI StudyPlanner</span>
+            </div>
+            <div class="d-flex gap-2">
+                <a href="{% url 'login' %}" class="btn btn-outline-light rounded-pill px-4">Sign In</a>
+                <a href="{% url 'register' %}" class="btn btn-primary rounded-pill px-4">Get Started</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 3D Hero Section -->
+    <div class="container my-auto py-5">
+        <div class="row align-items-center g-5">
+            <div class="col-lg-6">
+                <div class="d-inline-flex align-items-center gap-2 px-3 py-2 rounded-pill mb-3"
+                     style="background: rgba(168, 85, 247, 0.15); border: 1px solid rgba(168, 85, 247, 0.4);">
+                    <i class="bi bi-stars text-warning"></i>
+                    <span class="small fw-semibold text-white">Next-Gen AI Academic Workspace</span>
+                </div>
+                <h1 class="display-4 fw-bolder mb-3" style="line-height: 1.15;">
+                    Master Your Studies with <span class="brand-logo">3D Smart Planning.</span>
+                </h1>
+                <p class="lead text-muted mb-4">
+                    Organize subjects, crush exam deadlines, track Pomodoro streaks, and generate AI-powered revision strategies in one unified glass workspace.
+                </p>
+                <div class="d-flex flex-wrap gap-3">
+                    <a href="{% url 'register' %}" class="btn btn-primary btn-lg px-4 py-3">
+                        <i class="bi bi-rocket-takeoff me-2"></i>Launch Free Workspace
+                    </a>
+                    <a href="{% url 'login' %}" class="btn btn-outline-light btn-lg px-4 py-3 rounded-4">
+                        Sign In to Account
+                    </a>
+                </div>
+            </div>
+
+            <!-- 3D Floating Glass Feature Cards -->
+            <div class="col-lg-6">
+                <div class="row g-4">
+                    <div class="col-md-6">
+                        <div class="card p-4 h-100">
+                            <div class="icon-3d-cube mb-3" style="background: linear-gradient(135deg, #6366f1, #a855f7);">
+                                <i class="bi bi-cpu text-white"></i>
+                            </div>
+                            <h5 class="fw-bold">Explainable AI Planner</h5>
+                            <p class="text-muted small mb-0">Automatically ranks your daily tasks by urgency, priority, and topic difficulty.</p>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card p-4 h-100">
+                            <div class="icon-3d-cube mb-3" style="background: linear-gradient(135deg, #06b6d4, #3b82f6);">
+                                <i class="bi bi-stars text-white"></i>
+                            </div>
+                            <h5 class="fw-bold">Live Gemini AI Coach</h5>
+                            <p class="text-muted small mb-0">Generate custom revision strategies, note summaries, and practice MCQs on demand.</p>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card p-4 h-100">
+                            <div class="icon-3d-cube mb-3" style="background: linear-gradient(135deg, #f43f5e, #fb923c);">
+                                <i class="bi bi-fire text-white"></i>
+                            </div>
+                            <h5 class="fw-bold">Pomodoro & Streaks</h5>
+                            <p class="text-muted small mb-0">Stay focused with built-in 25m focus timers and daily study streak tracking.</p>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card p-4 h-100">
+                            <div class="icon-3d-cube mb-3" style="background: linear-gradient(135deg, #10b981, #14b8a6);">
+                                <i class="bi bi-graph-up-arrow text-white"></i>
+                            </div>
+                            <h5 class="fw-bold">Visual Analytics</h5>
+                            <p class="text-muted small mb-0">Interactive charts comparing planned goals with actual logged study minutes.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer class="text-center py-3 text-muted small">
+        AI-Powered Study Planner • Built with Django, Bootstrap 5 & 3D Glassmorphism
+    </footer>
+</div>
+{% endblock %}

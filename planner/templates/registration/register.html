@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+{% block title %}Create Account | AI Study Planner{% endblock %}
+
+{% block public_content %}
+<div class="min-vh-100 d-flex align-items-center justify-content-center py-5">
+    <div class="card p-4 shadow-sm" style="max-width: 480px; width: 100%;">
+        <div class="text-center mb-4">
+            <i class="bi bi-mortarboard-fill fs-1 text-primary"></i>
+            <h4 class="fw-bold mt-2">Create Your Student Account</h4>
+            <p class="text-muted small">Start planning your subjects and exams</p>
+        </div>
+
+        <form method="post">
+            {% csrf_token %}
+            {% for field in form %}
+                <div class="mb-3">
+                    <label class="form-label fw-semibold small">{{ field.label }}</label>
+                    {{ field }}
+                    {% if field.help_text %}
+                        <div class="form-text small">{{ field.help_text }}</div>
+                    {% endif %}
+                    {% for error in field.errors %}
+                        <div class="text-danger small mt-1">{{ error }}</div>
+                    {% endfor %}
+                </div>
+            {% endfor %}
+            <button type="submit" class="btn btn-primary w-100 py-2">Register & Continue</button>
+        </form>
+
+        <div class="text-center mt-3 small">
+            Already have an account? <a href="{% url 'login' %}" class="text-decoration-none fw-semibold">Sign in</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

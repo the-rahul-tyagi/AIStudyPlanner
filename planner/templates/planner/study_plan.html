@@ -1,0 +1,226 @@
+{% extends 'base.html' %}
+{% block title %}AI Study Planner & 3D Pomodoro | StudyOS{% endblock %}
+{% block page_title %}Explainable AI Scheduler & Focus Studio{% endblock %}
+
+{% block content %}
+<div class="row g-4 mb-4">
+    <!-- Left Column: Plan Generator + 3D Circular Pomodoro Ring + Session Logger -->
+    <div class="col-lg-4">
+        <!-- 1. Explainable Generator Card -->
+        <div class="card p-4">
+            <h6 class="fw-bold mb-2"><i class="bi bi-cpu-fill me-2 text-info"></i>AI Priority Plan Generator</h6>
+            <p class="text-muted small mb-3">
+                Scores tasks using <strong>Urgency (50%)</strong> + <strong>Priority (30%)</strong> + <strong>Difficulty (20%)</strong>.
+            </p>
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="generate">
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold">Available Study Budget (Minutes)</label>
+                    <input type="number" name="available_minutes" class="form-control" value="{{ profile.daily_goal_minutes }}" min="15" max="720">
+                </div>
+                <button type="submit" class="btn btn-primary w-100 mb-2">
+                    <i class="bi bi-lightning-charge-fill me-1"></i> Auto-Schedule My Day
+                </button>
+            </form>
+            {% if plan_blocks %}
+                <form method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="clear">
+                    <button type="submit" class="btn btn-outline-danger btn-sm w-100 rounded-pill mt-1">Reset Schedule</button>
+                </form>
+            {% endif %}
+        </div>
+
+        <!-- 2. 3D Circular SVG Ring Pomodoro Timer -->
+        <div class="card p-4 mt-4 text-center">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h6 class="fw-bold m-0"><i class="bi bi-disc-fill me-2 text-warning"></i>3D Focus Reactor</h6>
+                <span id="pomoModeBadge" class="badge rounded-pill px-3 py-1" style="background: var(--primary-grad);">Focus (25m)</span>
+            </div>
+
+            <!-- Animated SVG Circular Progress Ring -->
+            <div class="position-relative d-inline-block my-2" style="width: 180px; height: 180px;">
+                <svg width="180" height="180" style="transform: rotate(-90deg);">
+                    <circle cx="90" cy="90" r="76" stroke="rgba(255,255,255,0.08)" stroke-width="12" fill="transparent"/>
+                    <circle id="pomoRing" cx="90" cy="90" r="76" stroke="url(#ringGrad)" stroke-width="12" fill="transparent"
+                            stroke-dasharray="477.5" stroke-dashoffset="0" stroke-linecap="round"
+                            style="transition: stroke-dashoffset 0.8s linear; filter: drop-shadow(0 0 8px #a855f7);"/>
+                    <defs>
+                        <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stop-color="#06b6d4"/>
+                            <stop offset="50%" stop-color="#a855f7"/>
+                            <stop offset="100%" stop-color="#ec4899"/>
+                        </linearGradient>
+                    </defs>
+                </svg>
+                <div class="position-absolute top-50 start-50 translate-middle">
+                    <div id="pomoDisplay" class="fs-2 fw-bold font-monospace">25:00</div>
+                    <small id="pomoStatusText" class="text-muted" style="font-size: 0.72rem;">READY</small>
+                </div>
+            </div>
+
+            <div class="d-flex gap-2 mt-3">
+                <button type="button" id="pomoStartBtn" class="btn btn-primary btn-sm w-100" onclick="togglePomodoro()">
+                    <i class="bi bi-play-fill"></i> Start
+                </button>
+                <button type="button" class="btn btn-outline-light btn-sm w-100 rounded-3" onclick="resetPomodoro(25, 'Focus (25m)')">
+                    25m
+                </button>
+                <button type="button" class="btn btn-outline-info btn-sm w-100 rounded-3" onclick="resetPomodoro(5, 'Break (5m)')">
+                    5m Break
+                </button>
+            </div>
+        </div>
+
+        <!-- 3. Quick Session Logger -->
+        <div class="card p-4 mt-4">
+            <h6 class="fw-bold mb-3"><i class="bi bi-check2-circle me-2 text-success"></i>Log Study Effort</h6>
+            <form method="post" action="{% url 'log_session' %}">
+                {% csrf_token %}
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold">Subject</label>
+                    <select name="subject" class="form-select" required>
+                        {% for subject in user.subjects.all %}
+                            <option value="{{ subject.pk }}">{{ subject.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold">Duration (Minutes)</label>
+                    <input type="number" name="duration_minutes" class="form-control" value="25" min="5" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold">Session Notes</label>
+                    <textarea name="notes" class="form-control" rows="2" placeholder="What concepts did you cover?"></textarea>
+                </div>
+                <button type="submit" class="btn btn-success w-100">Save Session to Analytics</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Right Column: Holographic Timeline of Generated Study Blocks -->
+    <div class="col-lg-8">
+        <div class="card p-4 h-100">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h6 class="fw-bold m-0"><i class="bi bi-Stars me-2 text-warning"></i>OPTIMIZED TIMELINE FOR TODAY ({{ today }})</h6>
+                <span class="badge rounded-pill px-3 py-2" style="background: var(--primary-grad);">{{ plan_blocks.count }} Scheduled Blocks</span>
+            </div>
+
+            {% if plan_blocks %}
+                <div class="d-flex flex-column gap-3 mb-4">
+                    {% for block in plan_blocks %}
+                        <div class="p-3 rounded-4 d-flex flex-wrap justify-content-between align-items-center gap-3"
+                             style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); border-left: 4px solid {{ block.task.subject.color }};">
+                            <div class="d-flex align-items-center gap-3">
+                                <div class="icon-3d-cube text-white fw-bold" style="width: 44px; height: 44px; font-size: 1.1rem; background: var(--primary-grad);">
+                                    #{{ block.order }}
+                                </div>
+                                <div>
+                                    <div class="fw-bold fs-6">{{ block.task.title }}</div>
+                                    <div class="small text-muted mt-1">
+                                        <span class="badge rounded-pill me-2" style="background-color: {{ block.task.subject.color }};">{{ block.task.subject.name }}</span>
+                                        <i class="bi bi-clock me-1"></i><strong>{{ block.allocated_minutes }} mins</strong>
+                                    </div>
+                                    <div class="small text-info font-monospace mt-1" style="font-size: 0.78rem;">
+                                        <i class="bi bi-cpu me-1"></i>{{ block.score_explanation }} • <strong>Score: {{ block.score }}/100</strong>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <form method="post" action="{% url 'task_toggle' block.task.pk %}" class="m-0">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-sm rounded-pill px-3 {% if block.task.status == 'completed' %}btn-success{% else %}btn-outline-info{% endif %}">
+                                    {% if block.task.status == 'completed' %}<i class="bi bi-check-lg me-1"></i>Completed{% else %}Complete Block{% endif %}
+                                </button>
+                            </form>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="text-center py-5 text-muted my-auto">
+                    <i class="bi bi-boxes fs-1 d-block mb-3 text-info"></i>
+                    <h6 class="fw-bold text-white">Your Daily Timeline is Empty</h6>
+                    <p class="small mb-0">Enter your available minutes on the left and click <strong>"Auto-Schedule My Day"</strong>.</p>
+                </div>
+            {% endif %}
+
+            <!-- Recent Logged Sessions -->
+            <div class="mt-auto pt-3 border-top border-secondary border-opacity-25">
+                <h6 class="fw-bold mb-3 text-muted small text-uppercase">Recent Study Sessions</h6>
+                {% if sessions %}
+                    <ul class="list-group list-group-flush small">
+                        {% for session in sessions %}
+                            <li class="list-group-item px-0 d-flex justify-content-between align-items-center">
+                                <span><strong style="color: {{ session.subject.color }};">{{ session.subject.name }}</strong> • {{ session.started_at }}{% if session.notes %} — <span class="text-muted">{{ session.notes }}</span>{% endif %}</span>
+                                <span class="badge rounded-pill bg-info-subtle text-info px-3">{{ session.duration_minutes }} mins</span>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p class="text-muted small mb-0">No sessions logged yet.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const CIRCUMFERENCE = 477.5;
+    let pomoTotalSeconds = 25 * 60;
+    let pomoSeconds = 25 * 60;
+    let pomoTotalMins = 25;
+    let pomoInterval = null;
+
+    function updatePomoUI() {
+        const mins = String(Math.floor(pomoSeconds / 60)).padStart(2, '0');
+        const secs = String(pomoSeconds % 60).padStart(2, '0');
+        document.getElementById('pomoDisplay').textContent = `${mins}:${secs}`;
+
+        const ring = document.getElementById('pomoRing');
+        const offset = CIRCUMFERENCE - (pomoSeconds / pomoTotalSeconds) * CIRCUMFERENCE;
+        ring.style.strokeDashoffset = offset;
+    }
+
+    function togglePomodoro() {
+        const btn = document.getElementById('pomoStartBtn');
+        const statusText = document.getElementById('pomoStatusText');
+        if (pomoInterval) {
+            clearInterval(pomoInterval);
+            pomoInterval = null;
+            btn.innerHTML = '<i class="bi bi-play-fill"></i> Resume';
+            statusText.textContent = 'PAUSED';
+        } else {
+            btn.innerHTML = '<i class="bi bi-pause-fill"></i> Pause';
+            statusText.textContent = 'IN FOCUS';
+            pomoInterval = setInterval(() => {
+                if (pomoSeconds > 0) {
+                    pomoSeconds--;
+                    updatePomoUI();
+                } else {
+                    clearInterval(pomoInterval);
+                    pomoInterval = null;
+                    statusText.textContent = 'FINISHED!';
+                    const durationInput = document.querySelector('input[name="duration_minutes"]');
+                    if (durationInput) durationInput.value = pomoTotalMins;
+                    alert("Focus session complete! Duration auto-filled in Session Logger.");
+                }
+            }, 1000);
+        }
+    }
+
+    function resetPomodoro(minutes, label) {
+        clearInterval(pomoInterval);
+        pomoInterval = null;
+        pomoTotalMins = minutes;
+        pomoTotalSeconds = minutes * 60;
+        pomoSeconds = minutes * 60;
+        document.getElementById('pomoModeBadge').textContent = label;
+        document.getElementById('pomoStartBtn').innerHTML = '<i class="bi bi-play-fill"></i> Start';
+        document.getElementById('pomoStatusText').textContent = 'READY';
+        updatePomoUI();
+    }
+</script>
+{% endblock %}

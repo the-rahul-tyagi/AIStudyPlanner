@@ -1,0 +1,128 @@
+{% extends 'base.html' %}
+{% block title %}{{ subject.name }} - Topics | AI Study Planner{% endblock %}
+{% block page_title %}{{ subject.name }} — Topics & Syllabus{% endblock %}
+
+{% block content %}
+<div class="mb-3">
+    <a href="{% url 'subject_list' %}" class="btn btn-sm btn-outline-light rounded-pill px-3">
+        <i class="bi bi-arrow-left me-1"></i> Back to My Subjects
+    </a>
+</div>
+
+<div class="row g-4">
+    <!-- Left Column: Add Single Topic & Bulk Syllabus Importer -->
+    <div class="col-lg-4">
+        <!-- 1. Add Single Topic Form -->
+        <div class="card p-4">
+            <h6 class="fw-bold mb-3"><i class="bi bi-plus-circle me-2 text-primary"></i>Add Topic to {{ subject.name }}</h6>
+            <form method="post">
+                {% csrf_token %}
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold">Topic Title</label>
+                    {{ form.title }}
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold">Difficulty</label>
+                    {{ form.difficulty }}
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold">Estimated Study Minutes</label>
+                    {{ form.estimated_minutes }}
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold">Notes</label>
+                    {{ form.notes }}
+                </div>
+                <button type="submit" class="btn btn-primary w-100">
+                    <i class="bi bi-plus-lg me-1"></i> Add Topic
+                </button>
+            </form>
+        </div>
+
+        <!-- 2. Bulk Syllabus Importer Card -->
+        <div class="card p-4 mt-4">
+            <h6 class="fw-bold mb-2"><i class="bi bi-file-earmark-plus me-2 text-info"></i>Bulk Syllabus Importer</h6>
+            <p class="text-muted small mb-3">Paste multiple syllabus topics (one per line) to add them all in one click.</p>
+            <form method="post" action="{% url 'bulk_import_topics' subject.pk %}">
+                {% csrf_token %}
+                <div class="mb-3">
+                    <textarea name="raw_syllabus" class="form-control" rows="4" placeholder="1. Introduction to Relational Model
+2. SQL Joins & Subqueries
+3. Normalization (1NF to BCNF)
+4. Transaction & Concurrency Control" required></textarea>
+                </div>
+                <div class="row g-2 mb-3">
+                    <div class="col-6">
+                        <label class="form-label small fw-semibold">Default Difficulty</label>
+                        <select name="default_difficulty" class="form-select form-select-sm">
+                            <option value="easy">Easy</option>
+                            <option value="medium" selected>Medium</option>
+                            <option value="hard">Hard</option>
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label small fw-semibold">Mins / Topic</label>
+                        <input type="number" name="default_minutes" class="form-control form-control-sm" value="45" min="10">
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-outline-info w-100 rounded-pill">
+                    <i class="bi bi-cloud-upload me-1"></i> Bulk Create Topics
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Right Column: Topics List -->
+    <div class="col-lg-8">
+        <div class="card p-4 h-100">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h6 class="fw-bold m-0"><i class="bi bi-list-check me-2 text-info"></i>Syllabus Topics ({{ topics.count }})</h6>
+                <span class="badge rounded-pill bg-success px-3 py-2">{{ subject.progress_percentage }}% Completed</span>
+            </div>
+
+            <!-- Subject Progress Bar -->
+            <div class="progress mb-4" style="height: 10px;">
+                <div class="progress-bar" role="progressbar"
+                     style="width: {{ subject.progress_percentage }}%; background: linear-gradient(90deg, {{ subject.color }}, #a855f7);">
+                </div>
+            </div>
+
+            {% if topics %}
+                <div class="list-group list-group-flush">
+                    {% for topic in topics %}
+                        <div class="list-group-item px-0 py-3 d-flex justify-content-between align-items-center">
+                            <div class="d-flex align-items-center gap-3">
+                                <form method="post" action="{% url 'topic_toggle' topic.pk %}" class="m-0">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm rounded-circle {% if topic.is_completed %}btn-success{% else %}btn-outline-info{% endif %}" title="Toggle Completion">
+                                        <i class="bi {% if topic.is_completed %}bi-check-lg{% else %}bi-circle{% endif %}"></i>
+                                    </button>
+                                </form>
+                                <div>
+                                    <div class="fw-semibold {% if topic.is_completed %}text-decoration-line-through text-muted{% endif %}">
+                                        {{ topic.title }}
+                                    </div>
+                                    <small class="text-muted">
+                                        Difficulty: <span class="badge rounded-pill {% if topic.difficulty == 'hard' %}bg-danger-subtle text-danger{% elif topic.difficulty == 'medium' %}bg-warning-subtle text-warning{% else %}bg-info-subtle text-info{% endif %} text-capitalize">{{ topic.difficulty }}</span>
+                                        • Est. <strong>{{ topic.estimated_minutes }} mins</strong>
+                                        {% if topic.notes %} • {{ topic.notes }}{% endif %}
+                                    </small>
+                                </div>
+                            </div>
+                            <div class="d-flex gap-2">
+                                <a href="{% url 'topic_edit' topic.pk %}" class="btn btn-sm btn-outline-light rounded-pill px-3">Edit</a>
+                                <a href="{% url 'topic_delete' topic.pk %}" class="btn btn-sm btn-outline-danger rounded-pill px-3">Delete</a>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="text-center py-5 text-muted my-auto">
+                    <i class="bi bi-journal-code fs-1 d-block mb-2 text-info"></i>
+                    <p class="small mb-0">No topics added for this subject yet. Add a single topic or use the <strong>Bulk Syllabus Importer</strong> on the left!</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

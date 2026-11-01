@@ -1,0 +1,164 @@
+{% extends 'base.html' %}
+{% block title %}3D Flashcard Studio | AI Study Planner{% endblock %}
+{% block page_title %}3D Active-Recall Flashcard Deck{% endblock %}
+
+{% block content %}
+<style>
+    .flip-card {
+        background-color: transparent;
+        height: 230px;
+        perspective: 1000px;
+        cursor: pointer;
+    }
+    .flip-card-inner {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        text-align: center;
+        transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+        transform-style: preserve-3d;
+    }
+    .flip-card.flipped .flip-card-inner {
+        transform: rotateY(180deg);
+    }
+    .flip-card-front, .flip-card-back {
+        position: absolute;
+        inset: 0;
+        backface-visibility: hidden;
+        -webkit-backface-visibility: hidden;
+        border-radius: 1.25rem;
+        padding: 1.5rem;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        background: rgba(17, 24, 39, 0.72);
+        backdrop-filter: blur(20px);
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        border-top: 1px solid rgba(255, 255, 255, 0.35);
+        box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.7);
+    }
+    .flip-card-back {
+        transform: rotateY(180deg);
+        background: linear-gradient(135deg, rgba(99, 102, 241, 0.25), rgba(168, 85, 247, 0.25));
+        border-color: rgba(168, 85, 247, 0.5);
+    }
+</style>
+
+<div class="row g-4">
+    <!-- Left Column: AI Deck Generator & Manual Flashcard Creator -->
+    <div class="col-lg-4">
+        <div class="card p-4 mb-4">
+            <h6 class="fw-bold mb-2"><i class="bi bi-stars text-warning me-2"></i>1-Click AI Flashcard Deck</h6>
+            <p class="text-muted small mb-3">Enter any topic and let AI generate 4 active-recall flashcards automatically.</p>
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="ai_generate">
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold">Subject</label>
+                    <select name="subject" class="form-select" required>
+                        {% for s in subjects %}
+                            <option value="{{ s.pk }}">{{ s.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold">Topic Title</label>
+                    <input type="text" name="topic_title" class="form-control" placeholder="e.g., B-Trees & Indexing" required>
+                </div>
+                <button type="submit" class="btn btn-primary w-100">
+                    <i class="bi bi-lightning-charge-fill me-1"></i> Generate 4 AI Flashcards
+                </button>
+            </form>
+        </div>
+
+        <div class="card p-4">
+            <h6 class="fw-bold mb-3"><i class="bi bi-plus-circle me-2 text-info"></i>Create Manual Flashcard</h6>
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="manual">
+                <div class="mb-2">
+                    <label class="form-label small fw-semibold">Subject</label>
+                    <select name="subject" class="form-select form-select-sm" required>
+                        {% for s in subjects %}
+                            <option value="{{ s.pk }}">{{ s.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="mb-2">
+                    <label class="form-label small fw-semibold">Topic Tag</label>
+                    <input type="text" name="topic_title" class="form-control form-control-sm" placeholder="e.g., SQL Joins" required>
+                </div>
+                <div class="mb-2">
+                    <label class="form-label small fw-semibold">Front (Question / Term)</label>
+                    <textarea name="front_question" class="form-control form-control-sm" rows="2" required></textarea>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold">Back (Answer / Definition)</label>
+                    <textarea name="back_answer" class="form-control form-control-sm" rows="2" required></textarea>
+                </div>
+                <button type="submit" class="btn btn-outline-info btn-sm w-100 rounded-pill">Add Card to Deck</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Right Column: 3D Flip-Cards Grid -->
+    <div class="col-lg-8">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h6 class="fw-bold m-0"><i class="bi bi-layers-half me-2 text-info"></i>CLICK ANY CARD TO FLIP 180° ({{ flashcards.count }} Cards)</h6>
+        </div>
+
+        <div class="row g-4">
+            {% for card in flashcards %}
+                <div class="col-md-6">
+                    <div class="flip-card" onclick="this.classList.toggle('flipped')">
+                        <div class="flip-card-inner">
+                            <!-- Front of Card -->
+                            <div class="flip-card-front">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span class="badge rounded-pill" style="background-color: {{ card.subject.color }};">{{ card.subject.name }}</span>
+                                    <small class="text-muted">{{ card.topic_title }}</small>
+                                </div>
+                                <div class="my-auto px-2">
+                                    <div class="fw-bold fs-6">{{ card.front_question }}</div>
+                                </div>
+                                <div class="small text-info"><i class="bi bi-arrow-repeat me-1"></i>Click to flip answer</div>
+                            </div>
+
+                            <!-- Back of Card -->
+                            <div class="flip-card-back">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span class="badge rounded-pill bg-success">ANSWER</span>
+                                    <small class="text-white-50">{{ card.topic_title }}</small>
+                                </div>
+                                <div class="my-auto px-2">
+                                    <div class="small text-white">{{ card.back_answer }}</div>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center" onclick="event.stopPropagation();">
+                                    <form method="post" action="{% url 'flashcard_toggle' card.pk %}" class="m-0">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-sm rounded-pill px-3 {% if card.is_mastered %}btn-success{% else %}btn-outline-light{% endif %}">
+                                            {% if card.is_mastered %}<i class="bi bi-check-lg"></i> Mastered{% else %}Mark Mastered{% endif %}
+                                        </button>
+                                    </form>
+                                    <form method="post" action="{% url 'flashcard_delete' card.pk %}" class="m-0">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-sm btn-outline-danger rounded-circle"><i class="bi bi-trash"></i></button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            {% empty %}
+                <div class="col-12">
+                    <div class="card p-5 text-center text-muted">
+                        <i class="bi bi-collection-play fs-1 d-block mb-2 text-info"></i>
+                        <h6 class="text-white fw-bold">Your 3D Flashcard Deck is Empty</h6>
+                        <p class="small mb-0">Use the <strong>1-Click AI Flashcard Deck</strong> generator on the left to create interactive study cards!</p>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}

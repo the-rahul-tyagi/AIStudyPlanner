@@ -1,0 +1,123 @@
+{% extends 'base.html' %}
+{% block title %}Progress & Analytics | AI Study Planner{% endblock %}
+{% block page_title %}Progress & Study Analytics{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <span class="text-muted small">Showing analytics for the last <strong>{{ days_range }} days</strong></span>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{% url 'export_progress_csv' %}" class="btn btn-sm btn-outline-success">
+            <i class="bi bi-download me-1"></i> Export CSV Report
+        </a>
+        <div class="btn-group btn-group-sm">
+            <a href="?days=7" class="btn {% if days_range == 7 %}btn-primary{% else %}btn-outline-secondary{% endif %}">7 Days</a>
+            <a href="?days=14" class="btn {% if days_range == 14 %}btn-primary{% else %}btn-outline-secondary{% endif %}">14 Days</a>
+            <a href="?days=30" class="btn {% if days_range == 30 %}btn-primary{% else %}btn-outline-secondary{% endif %}">30 Days</a>
+        </div>
+    </div>
+</div>
+
+<!-- Summary Row -->
+<div class="row g-3 mb-4">
+    <div class="col-md-6">
+        <div class="card p-3">
+            <div class="text-muted small">Total Study Time (Last {{ days_range }} Days)</div>
+            <div class="fs-3 fw-bold text-primary">{{ total_minutes }} <span class="fs-6 fw-normal text-muted">minutes</span></div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card p-3">
+            <div class="text-muted small">Overall Tasks Completed</div>
+            <div class="fs-3 fw-bold text-success">{{ completed_tasks_count }} <span class="fs-6 fw-normal text-muted">/ {{ total_tasks_count }} tasks</span></div>
+        </div>
+    </div>
+</div>
+
+<!-- Charts Row -->
+<div class="row g-4 mb-4">
+    <div class="col-lg-8">
+        <div class="card p-4 h-100">
+            <h6 class="fw-bold mb-3">Daily Study Minutes Trend</h6>
+            <div style="height: 260px;">
+                <canvas id="trendChart"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="card p-4 h-100">
+            <h6 class="fw-bold mb-3">Time by Subject</h6>
+            <div style="height: 260px;">
+                <canvas id="subjectChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Session History Table -->
+<div class="card p-4">
+    <h6 class="fw-bold mb-3">Logged Study Session History</h6>
+    {% if sessions %}
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light small">
+                    <tr>
+                        <th>Date</th>
+                        <th>Subject</th>
+                        <th>Duration</th>
+                        <th>Notes</th>
+                    </tr>
+                </thead>
+                <tbody class="small">
+                    {% for s in sessions %}
+                        <tr>
+                            <td>{{ s.started_at }}</td>
+                            <td><span class="fw-semibold" style="color: {{ s.subject.color }};">{{ s.subject.name }}</span></td>
+                            <td><span class="badge bg-primary-subtle text-primary">{{ s.duration_minutes }} mins</span></td>
+                            <td class="text-muted">{{ s.notes|default:"—" }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <p class="text-muted small mb-0">No study sessions recorded in this date range.</p>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    new Chart(document.getElementById('trendChart'), {
+        type: 'line',
+        data: {
+            labels: {{ trend_labels_json|safe }},
+            datasets: [{
+                label: 'Study Minutes',
+                data: {{ trend_minutes_json|safe }},
+                borderColor: '#4f46e5',
+                backgroundColor: 'rgba(79, 70, 229, 0.15)',
+                fill: true,
+                tension: 0.3
+            }]
+        },
+        options: { responsive: true, maintainAspectRatio: false }
+    });
+
+    const subjLabels = {{ subj_labels_json|safe }};
+    if (subjLabels.length > 0) {
+        new Chart(document.getElementById('subjectChart'), {
+            type: 'doughnut',
+            data: {
+                labels: subjLabels,
+                datasets: [{
+                    data: {{ subj_minutes_json|safe }},
+                    backgroundColor: {{ subj_colors_json|safe }}
+                }]
+            },
+            options: { responsive: true, maintainAspectRatio: false }
+        });
+    }
+</script>
+{% endblock %}

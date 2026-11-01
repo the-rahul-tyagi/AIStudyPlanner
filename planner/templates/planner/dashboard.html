@@ -1,0 +1,260 @@
+{% extends 'base.html' %}
+{% block title %}Dashboard | AI Study Planner{% endblock %}
+{% block page_title %}Welcome back, {{ user.username }} ✨{% endblock %}
+
+{% block content %}
+<!-- Streak & 48-Hour Deadline Glass Banner -->
+<div class="glass-panel d-flex flex-wrap justify-content-between align-items-center p-3 px-4 mb-4">
+    <div class="d-flex align-items-center gap-3">
+        <span class="badge rounded-pill px-3 py-2 fs-6"
+              style="background: linear-gradient(135deg, #f97316, #ef4444); box-shadow: 0 6px 20px rgba(239, 68, 68, 0.45);">
+            <i class="bi bi-fire me-1"></i> {{ streak_days|default:0 }}-Day Study Streak
+        </span>
+        <span class="text-muted small">Log a study session daily to keep your momentum glowing!</span>
+    </div>
+    {% if urgent_exams or urgent_tasks %}
+        <div class="badge rounded-pill bg-danger-subtle text-danger border border-danger px-3 py-2 mt-2 mt-md-0">
+            <i class="bi bi-bell-fill me-1"></i>
+            Urgent: {{ urgent_exams.count }} exam(s) & {{ urgent_tasks.count }} task(s) due within 48h!
+        </div>
+    {% endif %}
+</div>
+
+<!-- 1. 3D Glass Metric Cards -->
+<div class="row g-4 mb-4">
+    <div class="col-sm-6 col-xl-3">
+        <div class="card p-4 h-100">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <div class="text-muted small fw-medium mb-1">Weekly Study Time</div>
+                    <div class="fs-2 fw-extrabold">{{ weekly_minutes }} <span class="fs-6 fw-normal text-muted">mins</span></div>
+                </div>
+                <div class="icon-3d-cube text-white" style="background: linear-gradient(135deg, #6366f1, #a855f7);">
+                    <i class="bi bi-clock-history"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-xl-3">
+        <div class="card p-4 h-100">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <div class="text-muted small fw-medium mb-1">Tasks Due Today</div>
+                    <div class="fs-2 fw-extrabold">{{ tasks_due_today }} <span class="fs-6 fw-normal text-muted">/ {{ pending_tasks_count }}</span></div>
+                </div>
+                <div class="icon-3d-cube text-white" style="background: linear-gradient(135deg, #f59e0b, #ef4444);">
+                    <i class="bi bi-list-check"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-xl-3">
+        <div class="card p-4 h-100">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <div class="text-muted small fw-medium mb-1">Topics Mastered</div>
+                    <div class="fs-2 fw-extrabold">{{ completed_topics_count }} <span class="fs-6 fw-normal text-muted">/ {{ total_topics_count }}</span></div>
+                </div>
+                <div class="icon-3d-cube text-white" style="background: linear-gradient(135deg, #10b981, #059669);">
+                    <i class="bi bi-check2-circle"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-xl-3">
+        <div class="card p-4 h-100">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <div class="text-muted small fw-medium mb-1">Daily Target</div>
+                    <div class="fs-2 fw-extrabold">{{ profile.daily_goal_minutes }} <span class="fs-6 fw-normal text-muted">mins</span></div>
+                </div>
+                <div class="icon-3d-cube text-white" style="background: linear-gradient(135deg, #06b6d4, #3b82f6);">
+                    <i class="bi bi-bullseye"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 2. Middle Row: Priority Tasks & Upcoming Exams -->
+<div class="row g-4 mb-4">
+    <div class="col-lg-7">
+        <div class="card p-4 h-100">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                <h6 class="fw-bold m-0"><i class="bi bi-lightning-charge-fill me-2 text-warning"></i>PRIORITY STUDY TASKS</h6>
+                <div class="d-flex gap-2">
+                    <form method="post" action="{% url 'rollover_tasks' %}" class="m-0">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-sm btn-outline-warning rounded-pill px-3" title="Move overdue tasks to today">
+                            <i class="bi bi-arrow-repeat me-1"></i>Roll Over Overdue
+                        </button>
+                    </form>
+                    <a href="{% url 'task_list' %}" class="btn btn-sm btn-primary px-3">+ New Task</a>
+                </div>
+            </div>
+
+            {% if todays_tasks %}
+                <div class="list-group list-group-flush">
+                    {% for task in todays_tasks %}
+                        <div class="list-group-item px-0 py-3 d-flex justify-content-between align-items-center">
+                            <div class="d-flex align-items-center gap-3">
+                                <form method="post" action="{% url 'task_toggle' task.pk %}" class="m-0">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm btn-outline-info rounded-circle" title="Complete Task">
+                                        <i class="bi bi-check-lg"></i>
+                                    </button>
+                                </form>
+                                <div>
+                                    <div class="fw-semibold">{{ task.title }}</div>
+                                    <small class="text-muted">
+                                        <span class="badge rounded-pill me-1" style="background-color: {{ task.subject.color }};">{{ task.subject.name }}</span>
+                                        {% if task.topic %}{{ task.topic.title }} • {% endif %}
+                                        {{ task.planned_minutes }} mins • Due {{ task.due_date }}
+                                    </small>
+                                </div>
+                            </div>
+                            <span class="badge rounded-pill {% if task.priority == 'high' %}bg-danger{% elif task.priority == 'medium' %}bg-primary{% else %}bg-secondary{% endif %} text-uppercase px-3 py-2">
+                                {{ task.priority }}
+                            </span>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="text-center py-5 text-muted my-auto">
+                    <i class="bi bi-stars fs-1 d-block mb-2 text-info"></i>
+                    <p class="small mb-3">All caught up! You have no pending study tasks.</p>
+                    <a href="{% url 'task_list' %}" class="btn btn-sm btn-primary px-4">Create Study Task</a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="col-lg-5">
+        <div class="card p-4 h-100">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h6 class="fw-bold m-0"><i class="bi bi-calendar2-heart-fill me-2 text-danger"></i>UPCOMING EXAMS</h6>
+                <a href="{% url 'exam_list' %}" class="btn btn-sm btn-outline-light rounded-pill px-3">+ Add Exam</a>
+            </div>
+
+            {% if upcoming_exams %}
+                <div class="list-group list-group-flush">
+                    {% for exam in upcoming_exams %}
+                        <div class="list-group-item px-0 py-3 d-flex justify-content-between align-items-center">
+                            <div>
+                                <div class="fw-semibold">{{ exam.title }}</div>
+                                <small class="text-muted">{{ exam.subject.name }} • {{ exam.exam_date }}</small>
+                            </div>
+                            <span class="badge rounded-pill px-3 py-2"
+                                  style="background: linear-gradient(135deg, #ec4899, #f43f5e);">
+                                {% if exam.days_remaining == 0 %}Today!{% else %}{{ exam.days_remaining }} days left{% endif %}
+                            </span>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="text-center py-5 text-muted my-auto">
+                    <i class="bi bi-calendar-event fs-1 d-block mb-2 text-danger"></i>
+                    <p class="small mb-3">No upcoming exams scheduled.</p>
+                    <a href="{% url 'exam_list' %}" class="btn btn-sm btn-outline-light rounded-pill px-4">Schedule Exam</a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- 3. Bottom Row: Subject Mastery & 7-Day Glass Chart -->
+<div class="row g-4">
+    <div class="col-lg-5">
+        <div class="card p-4 h-100">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h6 class="fw-bold m-0"><i class="bi bi-layers-fill me-2 text-info"></i>SUBJECT MASTERY</h6>
+                <a href="{% url 'subject_list' %}" class="btn btn-sm btn-outline-light rounded-pill px-3">All Subjects</a>
+            </div>
+
+            {% if subjects %}
+                {% for subject in subjects %}
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between small mb-2">
+                            <a href="{% url 'subject_detail' subject.pk %}" class="fw-semibold text-decoration-none text-white">
+                                {{ subject.name }}
+                            </a>
+                            <span class="text-muted">{{ subject.progress_percentage }}% ({{ subject.topics.count }} topics)</span>
+                        </div>
+                        <div class="progress" style="height: 10px;">
+                            <div class="progress-bar" role="progressbar"
+                                 style="width: {{ subject.progress_percentage }}%; background: linear-gradient(90deg, {{ subject.color }}, #a855f7);">
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <div class="text-center py-4 text-muted my-auto">
+                    <p class="small mb-2">No subjects added yet.</p>
+                    <a href="{% url 'subject_list' %}" class="btn btn-sm btn-primary">Add First Subject</a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="col-lg-7">
+        <div class="card p-4 h-100">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h6 class="fw-bold m-0"><i class="bi bi-bar-chart-steps me-2 text-primary"></i>7-DAY STUDY EFFORT VS GOAL</h6>
+                <span class="badge rounded-pill px-3 py-2" style="background: rgba(255,255,255,0.1);">
+                    Target: {{ profile.daily_goal_minutes }}m / day
+                </span>
+            </div>
+            <div style="height: 250px;">
+                <canvas id="weeklyStudyChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const ctx = document.getElementById('weeklyStudyChart');
+    if (ctx) {
+        const chartCtx = ctx.getContext('2d');
+        const barGradient = chartCtx.createLinearGradient(0, 0, 0, 250);
+        barGradient.addColorStop(0, 'rgba(168, 85, 247, 0.9)');
+        barGradient.addColorStop(1, 'rgba(99, 102, 241, 0.3)');
+
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: {{ chart_labels_json|safe }},
+                datasets: [
+                    {
+                        label: 'Actual Study Minutes',
+                        data: {{ chart_actual_json|safe }},
+                        backgroundColor: barGradient,
+                        borderColor: '#c084fc',
+                        borderWidth: 1,
+                        borderRadius: 8
+                    },
+                    {
+                        label: 'Daily Goal',
+                        data: {{ chart_goal_json|safe }},
+                        type: 'line',
+                        borderColor: '#2dd4bf',
+                        borderDash: [6, 6],
+                        pointBackgroundColor: '#2dd4bf',
+                        pointRadius: 4,
+                        fill: false,
+                        tension: 0.3
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: { beginAtZero: true }
+                }
+            }
+        });
+    }
+</script>
+{% endblock %}

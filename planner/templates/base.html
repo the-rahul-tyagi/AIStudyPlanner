@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}AI Study Planner OS{% endblock %}</title>
+    <!-- Google Fonts: Space Grotesk + Plus Jakarta Sans -->
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+    <!-- Bootstrap 5.3 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+
+    <style>
+        :root {
+            --accent-1: #6366f1;
+            --accent-2: #a855f7;
+            --accent-3: #ec4899;
+            --accent-4: #06b6d4;
+            --glass-surface: rgba(17, 24, 39, 0.55);
+            --glass-border: rgba(255, 255, 255, 0.14);
+            --glass-specular: rgba(255, 255, 255, 0.35);
+            --primary-grad: linear-gradient(135deg, var(--accent-1) 0%, var(--accent-2) 50%, var(--accent-3) 100%);
+        }
+
+        [data-aura="aurora"] {
+            --accent-1: #10b981;
+            --accent-2: #06b6d4;
+            --accent-3: #3b82f6;
+        }
+        [data-aura="sunset"] {
+            --accent-1: #f97316;
+            --accent-2: #ec4899;
+            --accent-3: #8b5cf6;
+        }
+
+        body {
+            font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+            background: #030712;
+            color: #f8fafc;
+            min-height: 100vh;
+            overflow-x: hidden;
+            perspective: 1400px;
+        }
+
+        h1, h2, h3, h4, h5, h6, .display-4, .fs-2 {
+            font-family: 'Space Grotesk', sans-serif;
+            letter-spacing: -0.02em;
+        }
+
+        /* ==================== 3D CYBER-GRID & AURORA MESH ==================== */
+        .spatial-backdrop {
+            position: fixed;
+            inset: 0;
+            z-index: -2;
+            background:
+                radial-gradient(circle at 15% 15%, color-mix(in srgb, var(--accent-1) 28%, transparent), transparent 40%),
+                radial-gradient(circle at 85% 20%, color-mix(in srgb, var(--accent-3) 24%, transparent), transparent 40%),
+                radial-gradient(circle at 50% 85%, color-mix(in srgb, var(--accent-4) 22%, transparent), transparent 45%),
+                #030712;
+        }
+        .cyber-grid {
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            background-image:
+                linear-gradient(to right, rgba(255,255,255,0.03) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(255,255,255,0.03) 1px, transparent 1px);
+            background-size: 48px 48px;
+            mask-image: radial-gradient(circle at 50% 35%, black 30%, transparent 85%);
+            pointer-events: none;
+        }
+
+        /* ==================== 3D INTERACTIVE HOLOGRAPHIC CARDS ==================== */
+        .card, .glass-panel {
+            position: relative;
+            background: var(--glass-surface) !important;
+            backdrop-filter: blur(24px) saturate(190%);
+            -webkit-backdrop-filter: blur(24px) saturate(190%);
+            border: 1px solid var(--glass-border) !important;
+            border-top: 1px solid var(--glass-specular) !important;
+            border-left: 1px solid rgba(255, 255, 255, 0.22) !important;
+            border-radius: 1.35rem !important;
+            box-shadow:
+                0 25px 50px -12px rgba(0, 0, 0, 0.75),
+                inset 0 1px 1px rgba(255, 255, 255, 0.25) !important;
+            transform-style: preserve-3d;
+            transition: transform 0.18s ease-out, box-shadow 0.3s ease, border-color 0.3s ease;
+            overflow: hidden;
+        }
+
+        /* Mouse-Tracking Radial Glare Spotlight */
+        .card::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(
+                500px circle at var(--mouse-x, -500px) var(--mouse-y, -500px),
+                rgba(255, 255, 255, 0.13),
+                transparent 40%
+            );
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .card:hover {
+            border-color: color-mix(in srgb, var(--accent-2) 60%, white) !important;
+            box-shadow:
+                0 30px 60px -15px rgba(0, 0, 0, 0.85),
+                0 0 30px -5px color-mix(in srgb, var(--accent-2) 35%, transparent),
+                inset 0 1px 2px rgba(255, 255, 255, 0.4) !important;
+        }
+
+        /* ==================== FLOATING SPATIAL SIDEBAR DOCK ==================== */
+        .spatial-sidebar {
+            position: sticky;
+            top: 1.25rem;
+            height: calc(100vh - 2.5rem);
+            background: rgba(10, 14, 28, 0.68);
+            backdrop-filter: blur(28px) saturate(200%);
+            border: 1px solid var(--glass-border);
+            border-top: 1px solid var(--glass-specular);
+            border-radius: 1.6rem;
+            box-shadow: 0 30px 60px rgba(0, 0, 0, 0.7);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 1.35rem 1rem;
+        }
+
+        .brand-logo {
+            background: var(--primary-grad);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-weight: 800;
+        }
+        .brand-orb {
+            width: 42px; height: 42px;
+            border-radius: 14px;
+            background: var(--primary-grad);
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 10px 25px color-mix(in srgb, var(--accent-2) 55%, transparent);
+            border-top: 1px solid rgba(255,255,255,0.5);
+        }
+
+        .spatial-sidebar .nav-link {
+            color: #94a3b8;
+            border-radius: 1rem;
+            margin-bottom: 0.35rem;
+            padding: 0.7rem 1rem;
+            font-weight: 600;
+            font-size: 0.92rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            transition: all 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+            border: 1px solid transparent;
+        }
+        .spatial-sidebar .nav-link i {
+            font-size: 1.15rem;
+            transition: transform 0.25s ease;
+        }
+        .spatial-sidebar .nav-link:hover {
+            color: #ffffff;
+            background: rgba(255, 255, 255, 0.07);
+            border-color: rgba(255, 255, 255, 0.12);
+            transform: translateX(6px) translateZ(10px);
+        }
+        .spatial-sidebar .nav-link:hover i {
+            transform: scale(1.2) rotate(-5deg);
+        }
+        .spatial-sidebar .nav-link.active {
+            background: var(--primary-grad);
+            color: #ffffff;
+            box-shadow: 0 12px 28px -6px color-mix(in srgb, var(--accent-2) 65%, transparent);
+            border-top: 1px solid rgba(255, 255, 255, 0.45);
+        }
+
+        /* ==================== FLOATING HUD TOPBAR ==================== */
+        .spatial-topbar {
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(22px);
+            border: 1px solid var(--glass-border);
+            border-top: 1px solid rgba(255, 255, 255, 0.28);
+            border-radius: 1.35rem;
+            padding: 0.85rem 1.5rem;
+            margin-top: 1.25rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 15px 35px -10px rgba(0, 0, 0, 0.6);
+        }
+
+        .cmd-trigger {
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 999px;
+            padding: 0.4rem 1rem;
+            color: #cbd5e1;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .cmd-trigger:hover {
+            background: rgba(255, 255, 255, 0.12);
+            border-color: var(--accent-2);
+            color: #fff;
+        }
+
+        /* ==================== 3D METRIC ICON CUBE ==================== */
+        .icon-3d-cube {
+            width: 56px; height: 56px;
+            border-radius: 18px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.6rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.55);
+            border-left: 1px solid rgba(255, 255, 255, 0.35);
+            box-shadow:
+                0 14px 28px -6px rgba(0, 0, 0, 0.6),
+                inset 0 -3px 6px rgba(0, 0, 0, 0.3);
+            transform: translateZ(25px);
+        }
+
+        /* ==================== FORMS, BUTTONS & PROGRESS ==================== */
+        .form-control, .form-select {
+            background: rgba(3, 7, 18, 0.65) !important;
+            border: 1px solid rgba(255, 255, 255, 0.16) !important;
+            color: #f8fafc !important;
+            border-radius: 0.9rem !important;
+            padding: 0.7rem 1rem;
+        }
+        .form-control:focus, .form-select:focus {
+            border-color: var(--accent-2) !important;
+            box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent-2) 25%, transparent) !important;
+        }
+        .btn-primary {
+            background: var(--primary-grad) !important;
+            border: none !important;
+            border-top: 1px solid rgba(255, 255, 255, 0.45) !important;
+            border-radius: 0.9rem !important;
+            font-weight: 600;
+            box-shadow: 0 10px 25px -5px color-mix(in srgb, var(--accent-2) 60%, transparent);
+            transition: all 0.25s ease;
+        }
+        .btn-primary:hover {
+            transform: translateY(-3px) scale(1.02);
+            box-shadow: 0 15px 30px -4px color-mix(in srgb, var(--accent-3) 75%, transparent);
+        }
+        .list-group-item {
+            background: transparent !important;
+            border-color: rgba(255, 255, 255, 0.08) !important;
+            color: #f8fafc !important;
+        }
+        .bg-light, .table-light, .bg-white {
+            background: rgba(255, 255, 255, 0.05) !important;
+            color: #f8fafc !important;
+        }
+        .text-dark { color: #f8fafc !important; }
+        .text-muted { color: #94a3b8 !important; }
+        @media print {
+            .spatial-backdrop, .cyber-grid, .spatial-sidebar, .spatial-topbar, .btn, form {
+                display: none !important;
+            }
+            body, .card, .glass-panel {
+                background: #ffffff !important;
+                color: #000000 !important;
+                box-shadow: none !important;
+                border: 1px solid #cccccc !important;
+            }
+            main {
+                width: 100% !important;
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- 3D Spatial Backdrop & Cyber Grid -->
+    <div class="spatial-backdrop"></div>
+    <div class="cyber-grid"></div>
+
+    {% if user.is_authenticated %}
+    <div class="container-fluid px-lg-4">
+        <div class="row g-4">
+            <!-- Left Floating 3D Spatial Dock -->
+            <div class="col-md-3 col-lg-2 d-none d-md-block">
+                <nav class="spatial-sidebar">
+                    <div>
+                        <a href="{% url 'dashboard' %}" class="d-flex align-items-center mb-4 text-decoration-none gap-2 px-2">
+                            <div class="brand-orb text-white">
+                                <i class="bi bi-boxes fs-5"></i>
+                            </div>
+                            <div>
+                                <div class="fs-5 brand-logo lh-1">StudyOS</div>
+                                <small class="text-muted" style="font-size: 0.68rem;">3D AI PLANNER</small>
+                            </div>
+                        </a>
+
+                        <ul class="nav flex-column" id="sidebarNav">
+                            <li class="nav-item">
+                                <a class="nav-link" href="{% url 'dashboard' %}">
+                                    <i class="bi bi-grid-1x2-fill text-info"></i> Dashboard
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="{% url 'subject_list' %}">
+                                    <i class="bi bi-layers-half text-primary"></i> My Subjects
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="{% url 'task_list' %}">
+                                    <i class="bi bi-check2-all text-success"></i> Study Tasks
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="{% url 'study_plan' %}">
+                                    <i class="bi bi-cpu-fill text-warning"></i> Study Plan
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="{% url 'calendar_view' %}">
+                                    <i class="bi bi-calendar3-week-fill text-info"></i> Calendar
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="{% url 'flashcard_list' %}">
+                                    <i class="bi bi-collection-play-fill text-primary"></i> 3D Flashcards
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="{% url 'exam_list' %}">
+                                    <i class="bi bi-calendar2-heart-fill text-danger"></i> Exams
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="{% url 'progress' %}">
+                                    <i class="bi bi-activity text-info"></i> Analytics
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="{% url 'ai_assistant' %}">
+                                    <i class="bi bi-stars text-warning"></i> AI Coach
+                                </a>
+                            </li>
+                            <!-- <li class="nav-item">
+                                <a class="nav-link" href="{% url 'flashcard_list' %}">
+                                    <i class="bi bi-Collection-play-fill text-info"></i> 3D Flashcards
+                                </a>
+                            </li> -->
+                            <li class="nav-item">
+                                <a class="nav-link" href="{% url 'settings' %}">
+                                    <i class="bi bi-sliders2-vertical text-secondary"></i> Settings
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+
+                    <!-- Aura Color Switcher in Sidebar Footer -->
+                    <div class="p-3 rounded-4" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);">
+                        <div class="small text-muted fw-semibold mb-2"><i class="bi bi-palette2 me-1"></i>3D Aura Theme</div>
+                        <div class="d-flex gap-2">
+                            <button onclick="setAura('cyber')" class="btn btn-sm w-100 rounded-pill" style="background: linear-gradient(135deg,#6366f1,#ec4899); height: 24px;" title="Cyberpunk"></button>
+                            <button onclick="setAura('aurora')" class="btn btn-sm w-100 rounded-pill" style="background: linear-gradient(135deg,#10b981,#3b82f6); height: 24px;" title="Aurora"></button>
+                            <button onclick="setAura('sunset')" class="btn btn-sm w-100 rounded-pill" style="background: linear-gradient(135deg,#f97316,#8b5cf6); height: 24px;" title="Sunset"></button>
+                        </div>
+                    </div>
+                </nav>
+            </div>
+
+            <!-- Main Spatial Content Area -->
+            <main class="col-12 col-md-9 col-lg-10 pb-5">
+                <header class="spatial-topbar d-flex flex-wrap justify-content-between align-items-center gap-3">
+                    <div>
+                        <h5 class="m-0 fw-bold">{% block page_title %}Command Center{% endblock %}</h5>
+                    </div>
+
+                    <!-- Quick Command Palette Trigger (Ctrl + K) -->
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="cmd-trigger d-none d-sm-flex align-items-center gap-2" data-bs-toggle="modal" data-bs-target="#cmdModal">
+                            <i class="bi bi-search text-info"></i>
+                            <span>Quick Jump...</span>
+                            <kbd class="bg-dark border border-secondary px-2 py-0 rounded small">Ctrl K</kbd>
+                        </div>
+
+                        <!-- Student XP / Profile Pill -->
+                        <div class="px-3 py-1 rounded-pill d-flex align-items-center gap-2"
+                             style="background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.16);">
+                            <span class="badge rounded-pill" style="background: var(--primary-grad);">PRO</span>
+                            <span class="small fw-bold">{{ user.username }}</span>
+                        </div>
+
+                        <form method="post" action="{% url 'logout' %}" class="m-0">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-outline-light btn-sm rounded-pill px-3">
+                                <i class="bi bi-power"></i>
+                            </button>
+                        </form>
+                    </div>
+                </header>
+
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="alert alert-{{ message.tags }} alert-dismissible fade show glass-panel border-0 mb-4 py-3 px-4" role="alert">
+                            <i class="bi bi-stars text-warning me-2"></i>{{ message }}
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert"></button>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+
+                {% block content %}{% endblock %}
+            </main>
+        </div>
+    </div>
+
+    <!-- Universal Ctrl+K Command Palette Modal -->
+    <div class="modal fade" id="cmdModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content glass-panel p-3 border-0">
+                <div class="modal-header border-0 pb-2">
+                    <h6 class="modal-title fw-bold"><i class="bi bi-terminal-fill text-info me-2"></i>Quick Navigation Palette</h6>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="text" id="cmdSearchInput" class="form-control mb-3" placeholder="Type a destination (e.g., AI Coach, Pomodoro, Exams)..." onkeyup="filterCmdLinks()">
+                    <div class="list-group list-group-flush" id="cmdLinksList">
+                        <a href="{% url 'dashboard' %}" class="list-group-item list-group-item-action rounded-3 mb-1"><i class="bi bi-grid-1x2-fill text-info me-2"></i>Go to Dashboard</a>
+                        <a href="{% url 'study_plan' %}" class="list-group-item list-group-item-action rounded-3 mb-1"><i class="bi bi-cpu-fill text-warning me-2"></i>Launch Study Plan & 3D Pomodoro Timer</a>
+                        <a href="{% url 'ai_assistant' %}" class="list-group-item list-group-item-action rounded-3 mb-1"><i class="bi bi-stars text-warning me-2"></i>Ask AI Study Coach / Generate Quiz</a>
+                        <a href="{% url 'subject_list' %}" class="list-group-item list-group-item-action rounded-3 mb-1"><i class="bi bi-layers-half text-primary me-2"></i>Manage Subjects & Topics</a>
+                        <a href="{% url 'task_list' %}" class="list-group-item list-group-item-action rounded-3 mb-1"><i class="bi bi-check2-all text-success me-2"></i>Create or Complete Study Tasks</a>
+                        <a href="{% url 'exam_list' %}" class="list-group-item list-group-item-action rounded-3 mb-1"><i class="bi bi-calendar2-heart-fill text-danger me-2"></i>View Exam Countdown</a>
+                        <a href="{% url 'progress' %}" class="list-group-item list-group-item-action rounded-3 mb-1"><i class="bi bi-activity text-info me-2"></i>View Analytics & Export CSV</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% else %}
+        {% block public_content %}{% endblock %}
+    {% endif %}
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        // 1. Set Chart.js Dark Holographic Defaults
+        if (window.Chart) {
+            Chart.defaults.color = '#94a3b8';
+            Chart.defaults.borderColor = 'rgba(255, 255, 255, 0.06)';
+        }
+
+        // 2. Active Sidebar Highlight
+        document.querySelectorAll('#sidebarNav .nav-link').forEach(link => {
+            if (link.getAttribute('href') === window.location.pathname) {
+                link.classList.add('active');
+            }
+        });
+
+        // 3. 3D Perspective Tilt & Mouse-Tracking Holographic Spotlight on Cards
+        document.querySelectorAll('.card').forEach(card => {
+            card.addEventListener('mousemove', e => {
+                const rect = card.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                card.style.setProperty('--mouse-x', `${x}px`);
+                card.style.setProperty('--mouse-y', `${y}px`);
+
+                // Subtle 3D tilt only if card doesn't contain a large form/table
+                if (!card.querySelector('form') && !card.querySelector('table')) {
+                    const rotateY = ((x / rect.width) - 0.5) * 8;
+                    const rotateX = ((y / rect.height) - 0.5) * -8;
+                    card.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) translateY(-4px)`;
+                }
+            });
+            card.addEventListener('mouseleave', () => {
+                card.style.transform = 'perspective(1000px) rotateX(0deg) rotateY(0deg) translateY(0)';
+            });
+        });
+
+        // 4. Ctrl + K Command Palette Shortcut
+        document.addEventListener('keydown', e => {
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+                e.preventDefault();
+                const modalEl = document.getElementById('cmdModal');
+                if (modalEl) {
+                    const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+                    modal.show();
+                    setTimeout(() => document.getElementById('cmdSearchInput')?.focus(), 200);
+                }
+            }
+        });
+
+        function filterCmdLinks() {
+            const q = document.getElementById('cmdSearchInput').value.toLowerCase();
+            document.querySelectorAll('#cmdLinksList a').forEach(a => {
+                a.style.display = a.textContent.toLowerCase().includes(q) ? '' : 'none';
+            });
+        }
+
+        // 5. Persistent Aura Theme Switcher
+        function setAura(theme) {
+            document.documentElement.setAttribute('data-aura', theme);
+            localStorage.setItem('studyos_aura', theme);
+        }
+        const savedAura = localStorage.getItem('studyos_aura');
+        if (savedAura) document.documentElement.setAttribute('data-aura', savedAura);
+    </script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

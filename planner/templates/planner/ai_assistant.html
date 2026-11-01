@@ -1,0 +1,267 @@
+{% extends 'base.html' %}
+{% block title %}AI Study Assistant | AI Study Planner{% endblock %}
+{% block page_title %}AI Study Coach & Interactive Quiz Studio{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+    <div class="col-lg-5">
+        <!-- AI Prompt Form -->
+        <div class="card p-4 mb-4">
+            <h6 class="fw-bold mb-2"><i class="bi bi-stars text-warning me-2"></i>Request AI Study Assistance</h6>
+            <form method="post">
+                {% csrf_token %}
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold">Subject</label>
+                    <select name="subject_name" class="form-select">
+                        {% for s in subjects %}
+                            <option value="{{ s.name }}">{{ s.name }}</option>
+                        {% empty %}
+                            <option value="General Studies">General Studies</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold">Topic Title</label>
+                    <input type="text" name="topic_title" class="form-control" placeholder="e.g., Deadlocks in OS" value="{{ tested_topic_title }}" required>
+                </div>
+                <div class="row g-2 mb-3">
+                    <div class="col-6">
+                        <label class="form-label small fw-semibold">Difficulty</label>
+                        <select name="difficulty" class="form-select">
+                            <option value="easy">Easy</option>
+                            <option value="medium" selected>Medium</option>
+                            <option value="hard">Hard</option>
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label small fw-semibold">Time Limit (Mins)</label>
+                        <input type="number" name="minutes" class="form-control" value="45" min="15" max="240">
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold">AI Mode</label>
+                    <select name="request_type" class="form-select">
+                        <option value="strategy">Step-by-Step Revision Strategy</option>
+                        <option value="breakdown">Break Topic into Smaller Study Tasks</option>
+                        <option value="quiz">Interactive MCQ Quiz (Auto-Graded)</option>
+                        <option value="explain">Explain Concept with Analogy & Example</option>
+                        <option value="summarize">Summarize My Study Notes</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold">Optional Notes (For "Summarize My Study Notes" mode)</label>
+                    <textarea name="notes_text" class="form-control" rows="2" placeholder="Paste lecture notes here if summarizing..."></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary w-100">
+                    <i class="bi bi-magic me-1"></i> Generate Study Guidance
+                </button>
+            </form>
+        </div>
+
+        <!-- Quiz Score Logger -->
+        <div class="card p-4">
+            <h6 class="fw-bold mb-3"><i class="bi bi-patch-check me-2 text-success"></i>Record Quiz Result</h6>
+            <form method="post" action="{% url 'log_quiz_attempt' %}" id="quizScoreForm">
+                {% csrf_token %}
+                <div class="mb-2">
+                    <label class="form-label small fw-semibold">Subject</label>
+                    <select name="subject" id="quizSubjectSelect" class="form-select form-select-sm" required>
+                        {% for s in subjects %}
+                            <option value="{{ s.pk }}" {% if s.pk == selected_subject_pk %}selected{% endif %}>{{ s.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="mb-2">
+                    <label class="form-label small fw-semibold">Topic Tested</label>
+                    <input type="text" name="topic_title" id="quizTopicInput" class="form-control form-control-sm" value="{{ tested_topic_title }}" placeholder="e.g., Normalization Quiz" required>
+                </div>
+                <div class="row g-2 mb-3">
+                    <div class="col-6">
+                        <label class="form-label small fw-semibold">Correct Answers</label>
+                        <input type="number" name="score" id="quizScoreInput" class="form-control form-control-sm" value="3" min="0" required>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label small fw-semibold">Total Questions</label>
+                        <input type="number" name="total_questions" id="quizTotalInput" class="form-control form-control-sm" value="3" min="1" required>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-success btn-sm w-100">Save Quiz Score</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="col-lg-7">
+        {% if interactive_quiz_json %}
+        <!-- Interactive Auto-Graded Quiz Card -->
+        <div class="card p-4 mb-4 border-info">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h6 class="fw-bold m-0"><i class="bi bi-controller me-2 text-info"></i>Interactive Practice Quiz: {{ tested_topic_title }}</h6>
+                <span id="liveQuizScoreBadge" class="badge rounded-pill bg-info text-dark px-3 py-2">Select answers below</span>
+            </div>
+            <div id="interactiveQuizContainer" class="d-flex flex-column gap-3 mb-3"></div>
+            <div class="d-flex gap-2">
+                <button type="button" class="btn btn-primary w-100" onclick="gradeInteractiveQuiz()">
+                    <i class="bi bi-check2-circle me-1"></i> Grade My Answers & Auto-Fill Score
+                </button>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Generated AI Response -->
+        <div class="card p-4 mb-4">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h6 class="fw-bold m-0">Generated Recommendation</h6>
+                {% if ai_response %}
+                    <span class="badge bg-info-subtle text-info border">{{ ai_response.source }}</span>
+                {% endif %}
+            </div>
+
+            {% if ai_response %}
+                <div class="d-flex flex-wrap justify-content-end gap-2 mb-2">
+                    <form method="post" action="{% url 'convert_ai_to_tasks' %}" class="m-0">
+                        {% csrf_token %}
+                        <input type="hidden" name="subject_name" value="{{ request.POST.subject_name }}">
+                        <textarea name="ai_content" class="d-none">{{ ai_response.content }}</textarea>
+                        <button type="submit" class="btn btn-sm btn-success rounded-pill px-3">
+                            <i class="bi bi-plus-circle me-1"></i> Save Bullet Points as Study Tasks
+                        </button>
+                    </form>
+                    <button type="button" class="btn btn-sm btn-outline-info rounded-pill px-3" onclick="copyAiText()">
+                        <i class="bi bi-clipboard me-1"></i> Copy Response
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-light rounded-pill px-3" onclick="window.print()">
+                        <i class="bi bi-file-earmark-pdf me-1"></i> Save Notes as PDF
+                    </button>
+                </div>
+                <div id="aiRawContent" class="d-none">{{ ai_response.content }}</div>
+                <div id="aiFormattedOutput" class="p-4 rounded-4 mb-3"
+                     style="background: rgba(3, 7, 18, 0.65); border: 1px solid rgba(255,255,255,0.12); line-height: 1.7; font-size: 0.96rem;">
+                </div>
+                <div class="alert alert-warning small mb-0 py-2 border-0" style="background: rgba(245, 158, 11, 0.15); color: #fde68a;">
+                    <i class="bi bi-exclamation-triangle me-1"></i>
+                    <strong>Note:</strong> Always verify AI-generated definitions and quiz answers against your official course syllabus.
+                </div>
+            {% else %}
+                <div class="text-center py-5 text-muted">
+                    <i class="bi bi-robot fs-1 d-block mb-2 text-info"></i>
+                    <p class="small mb-0">Select an AI mode on the left to generate a revision strategy, concept explanation, note summary, or interactive quiz.</p>
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- Recent Quiz Attempts History -->
+        <div class="card p-4">
+            <h6 class="fw-bold mb-3">Recent Quiz Performance</h6>
+            {% if quiz_attempts %}
+                <div class="list-group list-group-flush small">
+                    {% for q in quiz_attempts %}
+                        <div class="list-group-item px-0 py-2 d-flex justify-content-between align-items-center">
+                            <div>
+                                <strong>{{ q.topic_title }}</strong> ({{ q.subject.name }})
+                                <span class="text-muted ms-2">• {{ q.attempted_at|date:"d M Y" }}</span>
+                            </div>
+                            <span class="badge rounded-pill px-3 py-2 {% if q.percentage >= 70 %}bg-success{% elif q.percentage >= 40 %}bg-warning text-dark{% else %}bg-danger{% endif %}">
+                                {{ q.score }}/{{ q.total_questions }} ({{ q.percentage }}%)
+                            </span>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="text-muted small mb-0">No quiz attempts recorded yet. Generate a quiz above and log your score!</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script>
+    const rawEl = document.getElementById('aiRawContent');
+    const outEl = document.getElementById('aiFormattedOutput');
+    if (rawEl && outEl && window.marked) {
+        outEl.innerHTML = marked.parse(rawEl.textContent);
+    } else if (rawEl && outEl) {
+        outEl.textContent = rawEl.textContent;
+    }
+
+    function copyAiText() {
+        if (!rawEl) return;
+        navigator.clipboard.writeText(rawEl.textContent);
+        alert("AI Study Guidance copied to clipboard!");
+    }
+
+    // Interactive Quiz Renderer & Auto-Grader
+    {% if interactive_quiz_json %}
+    const quizData = {{ interactive_quiz_json|safe }};
+    const quizContainer = document.getElementById('interactiveQuizContainer');
+
+    if (quizContainer && Array.isArray(quizData)) {
+        quizData.forEach((q, qIndex) => {
+            const block = document.createElement('div');
+            block.className = 'p-3 rounded-4';
+            block.style.background = 'rgba(255,255,255,0.04)';
+            block.style.border = '1px solid rgba(255,255,255,0.1)';
+
+            let optionsHtml = '';
+            (q.options || []).forEach((opt, optIndex) => {
+                optionsHtml += `
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="radio" name="q_${qIndex}" id="q_${qIndex}_${optIndex}" value="${optIndex}">
+                        <label class="form-check-label small" for="q_${qIndex}_${optIndex}" id="label_${qIndex}_${optIndex}">
+                            ${opt}
+                        </label>
+                    </div>
+                `;
+            });
+
+            block.innerHTML = `
+                <div class="fw-bold small mb-2">Q${qIndex + 1}. ${q.question}</div>
+                ${optionsHtml}
+                <div id="exp_${qIndex}" class="small mt-2 p-2 rounded-3 d-none" style="background: rgba(6, 182, 212, 0.15); color: #67e8f9;">
+                    <strong>Explanation:</strong> ${q.explanation || ''}
+                </div>
+            `;
+            quizContainer.appendChild(block);
+        });
+    }
+
+    function gradeInteractiveQuiz() {
+        let correctCount = 0;
+        quizData.forEach((q, qIndex) => {
+            const selected = document.querySelector(`input[name="q_${qIndex}"]:checked`);
+            const expEl = document.getElementById(`exp_${qIndex}`);
+            if (expEl) expEl.classList.remove('d-none');
+
+            (q.options || []).forEach((_, optIndex) => {
+                const lbl = document.getElementById(`label_${qIndex}_${optIndex}`);
+                if (!lbl) return;
+                lbl.style.fontWeight = 'normal';
+                lbl.style.color = '#f8fafc';
+                if (optIndex === q.correct_index) {
+                    lbl.style.color = '#34d399';
+                    lbl.style.fontWeight = '700';
+                }
+            });
+
+            if (selected && parseInt(selected.value) === q.correct_index) {
+                correctCount++;
+            } else if (selected) {
+                const wrongLbl = document.getElementById(`label_${qIndex}_${selected.value}`);
+                if (wrongLbl) wrongLbl.style.color = '#f87171';
+            }
+        });
+
+        const badge = document.getElementById('liveQuizScoreBadge');
+        if (badge) {
+            badge.textContent = `Scored: ${correctCount} / ${quizData.length}`;
+            badge.className = 'badge rounded-pill bg-success px-3 py-2';
+        }
+        const scoreInput = document.getElementById('quizScoreInput');
+        const totalInput = document.getElementById('quizTotalInput');
+        if (scoreInput) scoreInput.value = correctCount;
+        if (totalInput) totalInput.value = quizData.length;
+    }
+    {% endif %}
+</script>
+{% endblock %}

@@ -1,0 +1,57 @@
+# ==================== PYTHON BYTECODE & CACHE ====================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# ==================== VIRTUAL ENVIRONMENTS ====================
+venv/
+env/
+ENV/
+.venv/
+
+# ==================== DJANGO & DATABASE ====================
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+staticfiles/
+media/
+
+# ==================== ENVIRONMENT & SECRET KEYS ====================
+# Never commit your actual .env file or API keys!
+# (Keep .env.example tracked so others know what variables are needed)
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# ==================== TESTING & COVERAGE ====================
+.coverage
+htmlcov/
+.pytest_cache/
+.tox/
+.nox/
+
+# ==================== IDE & EDITOR FILES ====================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ==================== OS GENERATED FILES ====================
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
