@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-bs-theme="dark">
+<html lang="en" data-bs-theme="dark" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -11,16 +11,66 @@
     <!-- Bootstrap Icons -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
 
+    <!-- Instant Theme & Aura Loader (Prevents flash on page load) -->
+    <script>
+        (function() {
+            const savedTheme = localStorage.getItem('studyos_theme') || 'dark';
+            const savedAura = localStorage.getItem('studyos_aura') || 'cyber';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+            document.documentElement.setAttribute('data-bs-theme', savedTheme);
+            document.documentElement.setAttribute('data-aura', savedAura);
+        })();
+    </script>
+
     <style>
-        :root {
+        /* ==================== CORE AURA & THEME VARIABLES ==================== */
+        :root,
+        [data-theme="dark"] {
             --accent-1: #6366f1;
             --accent-2: #a855f7;
             --accent-3: #ec4899;
             --accent-4: #06b6d4;
-            --glass-surface: rgba(17, 24, 39, 0.55);
+            --primary-grad: linear-gradient(135deg, var(--accent-1) 0%, var(--accent-2) 50%, var(--accent-3) 100%);
+
+            --bg-base: #030712;
+            --text-main: #f8fafc;
+            --text-muted-custom: #94a3b8;
+            --glass-surface: rgba(17, 24, 39, 0.58);
             --glass-border: rgba(255, 255, 255, 0.14);
             --glass-specular: rgba(255, 255, 255, 0.35);
-            --primary-grad: linear-gradient(135deg, var(--accent-1) 0%, var(--accent-2) 50%, var(--accent-3) 100%);
+            --glass-left-border: rgba(255, 255, 255, 0.22);
+            --sidebar-bg: rgba(10, 14, 28, 0.68);
+            --topbar-bg: rgba(15, 23, 42, 0.62);
+            --input-bg: rgba(3, 7, 18, 0.65);
+            --input-border: rgba(255, 255, 255, 0.16);
+            --card-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.75), inset 0 1px 1px rgba(255, 255, 255, 0.25);
+            --card-hover-shadow: 0 30px 60px -15px rgba(0, 0, 0, 0.85), 0 0 30px -5px color-mix(in srgb, var(--accent-2) 35%, transparent), inset 0 1px 2px rgba(255, 255, 255, 0.4);
+            --spotlight-color: rgba(255, 255, 255, 0.13);
+            --grid-line: rgba(255, 255, 255, 0.03);
+            --subtle-surface: rgba(255, 255, 255, 0.06);
+            --nav-link-color: #94a3b8;
+            --nav-link-hover-bg: rgba(255, 255, 255, 0.07);
+        }
+
+        [data-theme="light"] {
+            --bg-base: #f1f5f9;
+            --text-main: #0f172a;
+            --text-muted-custom: #475569;
+            --glass-surface: rgba(255, 255, 255, 0.78);
+            --glass-border: rgba(15, 23, 42, 0.10);
+            --glass-specular: rgba(255, 255, 255, 0.95);
+            --glass-left-border: rgba(255, 255, 255, 0.85);
+            --sidebar-bg: rgba(255, 255, 255, 0.82);
+            --topbar-bg: rgba(255, 255, 255, 0.80);
+            --input-bg: rgba(255, 255, 255, 0.92);
+            --input-border: rgba(15, 23, 42, 0.16);
+            --card-shadow: 0 20px 40px -15px rgba(15, 23, 42, 0.10), inset 0 1px 2px rgba(255, 255, 255, 0.9);
+            --card-hover-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.16), 0 0 28px -5px color-mix(in srgb, var(--accent-2) 28%, transparent), inset 0 1px 2px rgba(255, 255, 255, 1);
+            --spotlight-color: rgba(99, 102, 241, 0.10);
+            --grid-line: rgba(15, 23, 42, 0.045);
+            --subtle-surface: rgba(15, 23, 42, 0.05);
+            --nav-link-color: #475569;
+            --nav-link-hover-bg: rgba(99, 102, 241, 0.08);
         }
 
         [data-aura="aurora"] {
@@ -36,16 +86,18 @@
 
         body {
             font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
-            background: #030712;
-            color: #f8fafc;
+            background: var(--bg-base);
+            color: var(--text-main);
             min-height: 100vh;
             overflow-x: hidden;
             perspective: 1400px;
+            transition: background-color 0.3s ease, color 0.3s ease;
         }
 
         h1, h2, h3, h4, h5, h6, .display-4, .fs-2 {
             font-family: 'Space Grotesk', sans-serif;
             letter-spacing: -0.02em;
+            color: var(--text-main);
         }
 
         /* ==================== 3D CYBER-GRID & AURORA MESH ==================== */
@@ -54,20 +106,22 @@
             inset: 0;
             z-index: -2;
             background:
-                radial-gradient(circle at 15% 15%, color-mix(in srgb, var(--accent-1) 28%, transparent), transparent 40%),
-                radial-gradient(circle at 85% 20%, color-mix(in srgb, var(--accent-3) 24%, transparent), transparent 40%),
-                radial-gradient(circle at 50% 85%, color-mix(in srgb, var(--accent-4) 22%, transparent), transparent 45%),
-                #030712;
+                radial-gradient(circle at 15% 15%, color-mix(in srgb, var(--accent-1) 26%, transparent), transparent 40%),
+                radial-gradient(circle at 85% 20%, color-mix(in srgb, var(--accent-3) 22%, transparent), transparent 40%),
+                radial-gradient(circle at 50% 85%, color-mix(in srgb, var(--accent-4) 20%, transparent), transparent 45%),
+                var(--bg-base);
+            transition: background 0.35s ease;
         }
         .cyber-grid {
             position: fixed;
             inset: 0;
             z-index: -1;
             background-image:
-                linear-gradient(to right, rgba(255,255,255,0.03) 1px, transparent 1px),
-                linear-gradient(to bottom, rgba(255,255,255,0.03) 1px, transparent 1px);
+                linear-gradient(to right, var(--grid-line) 1px, transparent 1px),
+                linear-gradient(to bottom, var(--grid-line) 1px, transparent 1px);
             background-size: 48px 48px;
             mask-image: radial-gradient(circle at 50% 35%, black 30%, transparent 85%);
+            -webkit-mask-image: radial-gradient(circle at 50% 35%, black 30%, transparent 85%);
             pointer-events: none;
         }
 
@@ -75,17 +129,16 @@
         .card, .glass-panel {
             position: relative;
             background: var(--glass-surface) !important;
+            color: var(--text-main) !important;
             backdrop-filter: blur(24px) saturate(190%);
             -webkit-backdrop-filter: blur(24px) saturate(190%);
             border: 1px solid var(--glass-border) !important;
             border-top: 1px solid var(--glass-specular) !important;
-            border-left: 1px solid rgba(255, 255, 255, 0.22) !important;
+            border-left: 1px solid var(--glass-left-border) !important;
             border-radius: 1.35rem !important;
-            box-shadow:
-                0 25px 50px -12px rgba(0, 0, 0, 0.75),
-                inset 0 1px 1px rgba(255, 255, 255, 0.25) !important;
+            box-shadow: var(--card-shadow) !important;
             transform-style: preserve-3d;
-            transition: transform 0.18s ease-out, box-shadow 0.3s ease, border-color 0.3s ease;
+            transition: transform 0.18s ease-out, box-shadow 0.3s ease, border-color 0.3s ease, background 0.3s ease;
             overflow: hidden;
         }
 
@@ -96,7 +149,7 @@
             inset: 0;
             background: radial-gradient(
                 500px circle at var(--mouse-x, -500px) var(--mouse-y, -500px),
-                rgba(255, 255, 255, 0.13),
+                var(--spotlight-color),
                 transparent 40%
             );
             pointer-events: none;
@@ -104,11 +157,8 @@
         }
 
         .card:hover {
-            border-color: color-mix(in srgb, var(--accent-2) 60%, white) !important;
-            box-shadow:
-                0 30px 60px -15px rgba(0, 0, 0, 0.85),
-                0 0 30px -5px color-mix(in srgb, var(--accent-2) 35%, transparent),
-                inset 0 1px 2px rgba(255, 255, 255, 0.4) !important;
+            border-color: color-mix(in srgb, var(--accent-2) 60%, var(--text-main)) !important;
+            box-shadow: var(--card-hover-shadow) !important;
         }
 
         /* ==================== FLOATING SPATIAL SIDEBAR DOCK ==================== */
@@ -116,16 +166,18 @@
             position: sticky;
             top: 1.25rem;
             height: calc(100vh - 2.5rem);
-            background: rgba(10, 14, 28, 0.68);
+            background: var(--sidebar-bg);
             backdrop-filter: blur(28px) saturate(200%);
+            -webkit-backdrop-filter: blur(28px) saturate(200%);
             border: 1px solid var(--glass-border);
             border-top: 1px solid var(--glass-specular);
             border-radius: 1.6rem;
-            box-shadow: 0 30px 60px rgba(0, 0, 0, 0.7);
+            box-shadow: var(--card-shadow);
             display: flex;
             flex-direction: column;
             justify-content: space-between;
             padding: 1.35rem 1rem;
+            transition: background 0.3s ease, border-color 0.3s ease;
         }
 
         .brand-logo {
@@ -144,7 +196,7 @@
         }
 
         .spatial-sidebar .nav-link {
-            color: #94a3b8;
+            color: var(--nav-link-color);
             border-radius: 1rem;
             margin-bottom: 0.35rem;
             padding: 0.7rem 1rem;
@@ -161,9 +213,9 @@
             transition: transform 0.25s ease;
         }
         .spatial-sidebar .nav-link:hover {
-            color: #ffffff;
-            background: rgba(255, 255, 255, 0.07);
-            border-color: rgba(255, 255, 255, 0.12);
+            color: var(--text-main);
+            background: var(--nav-link-hover-bg);
+            border-color: var(--glass-border);
             transform: translateX(6px) translateZ(10px);
         }
         .spatial-sidebar .nav-link:hover i {
@@ -171,38 +223,73 @@
         }
         .spatial-sidebar .nav-link.active {
             background: var(--primary-grad);
-            color: #ffffff;
+            color: #ffffff !important;
             box-shadow: 0 12px 28px -6px color-mix(in srgb, var(--accent-2) 65%, transparent);
             border-top: 1px solid rgba(255, 255, 255, 0.45);
         }
 
         /* ==================== FLOATING HUD TOPBAR ==================== */
         .spatial-topbar {
-            background: rgba(15, 23, 42, 0.6);
+            background: var(--topbar-bg);
             backdrop-filter: blur(22px);
+            -webkit-backdrop-filter: blur(22px);
             border: 1px solid var(--glass-border);
-            border-top: 1px solid rgba(255, 255, 255, 0.28);
+            border-top: 1px solid var(--glass-specular);
             border-radius: 1.35rem;
             padding: 0.85rem 1.5rem;
             margin-top: 1.25rem;
             margin-bottom: 1.5rem;
-            box-shadow: 0 15px 35px -10px rgba(0, 0, 0, 0.6);
+            box-shadow: var(--card-shadow);
+            transition: background 0.3s ease, border-color 0.3s ease;
         }
 
-        .cmd-trigger {
-            background: rgba(255, 255, 255, 0.06);
-            border: 1px solid rgba(255, 255, 255, 0.15);
+        .cmd-trigger, .theme-pill-btn {
+            background: var(--subtle-surface);
+            border: 1px solid var(--glass-border);
             border-radius: 999px;
-            padding: 0.4rem 1rem;
-            color: #cbd5e1;
+            padding: 0.42rem 0.95rem;
+            color: var(--text-main);
             font-size: 0.85rem;
+            font-weight: 600;
             cursor: pointer;
             transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.45rem;
         }
-        .cmd-trigger:hover {
-            background: rgba(255, 255, 255, 0.12);
+        .cmd-trigger:hover, .theme-pill-btn:hover {
+            background: color-mix(in srgb, var(--accent-1) 15%, var(--subtle-surface));
             border-color: var(--accent-2);
-            color: #fff;
+            color: var(--text-main);
+            transform: translateY(-1px);
+        }
+
+        /* Floating Theme Toggle for Public Pages (Login / Register / Landing) */
+        .public-theme-fab {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            z-index: 1080;
+            background: var(--glass-surface);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-top: 1px solid var(--glass-specular);
+            box-shadow: var(--card-shadow);
+            color: var(--text-main);
+            border-radius: 999px;
+            padding: 0.6rem 1.15rem;
+            font-weight: 600;
+            font-size: 0.86rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            cursor: pointer;
+            transition: all 0.25s ease;
+        }
+        .public-theme-fab:hover {
+            transform: translateY(-3px) scale(1.03);
+            border-color: var(--accent-2);
         }
 
         /* ==================== 3D METRIC ICON CUBE ==================== */
@@ -214,18 +301,22 @@
             border-top: 1px solid rgba(255, 255, 255, 0.55);
             border-left: 1px solid rgba(255, 255, 255, 0.35);
             box-shadow:
-                0 14px 28px -6px rgba(0, 0, 0, 0.6),
-                inset 0 -3px 6px rgba(0, 0, 0, 0.3);
+                0 14px 28px -6px rgba(0, 0, 0, 0.35),
+                inset 0 -3px 6px rgba(0, 0, 0, 0.25);
             transform: translateZ(25px);
         }
 
-        /* ==================== FORMS, BUTTONS & PROGRESS ==================== */
+        /* ==================== FORMS, BUTTONS & UTILITIES ==================== */
         .form-control, .form-select {
-            background: rgba(3, 7, 18, 0.65) !important;
-            border: 1px solid rgba(255, 255, 255, 0.16) !important;
-            color: #f8fafc !important;
+            background: var(--input-bg) !important;
+            border: 1px solid var(--input-border) !important;
+            color: var(--text-main) !important;
             border-radius: 0.9rem !important;
             padding: 0.7rem 1rem;
+        }
+        .form-control::placeholder {
+            color: var(--text-muted-custom) !important;
+            opacity: 0.75;
         }
         .form-control:focus, .form-select:focus {
             border-color: var(--accent-2) !important;
@@ -233,6 +324,7 @@
         }
         .btn-primary {
             background: var(--primary-grad) !important;
+            color: #ffffff !important;
             border: none !important;
             border-top: 1px solid rgba(255, 255, 255, 0.45) !important;
             border-radius: 0.9rem !important;
@@ -246,17 +338,29 @@
         }
         .list-group-item {
             background: transparent !important;
-            border-color: rgba(255, 255, 255, 0.08) !important;
-            color: #f8fafc !important;
+            border-color: var(--glass-border) !important;
+            color: var(--text-main) !important;
         }
         .bg-light, .table-light, .bg-white {
-            background: rgba(255, 255, 255, 0.05) !important;
-            color: #f8fafc !important;
+            background: var(--subtle-surface) !important;
+            color: var(--text-main) !important;
         }
-        .text-dark { color: #f8fafc !important; }
-        .text-muted { color: #94a3b8 !important; }
+        .text-dark { color: var(--text-main) !important; }
+        .text-muted { color: var(--text-muted-custom) !important; }
+
+        [data-theme="light"] .btn-outline-light {
+            color: var(--text-main) !important;
+            border-color: var(--glass-border) !important;
+        }
+        [data-theme="light"] .btn-outline-light:hover {
+            background: var(--subtle-surface) !important;
+        }
+        [data-theme="light"] .btn-close-white {
+            filter: none !important;
+        }
+
         @media print {
-            .spatial-backdrop, .cyber-grid, .spatial-sidebar, .spatial-topbar, .btn, form {
+            .spatial-backdrop, .cyber-grid, .spatial-sidebar, .spatial-topbar, .public-theme-fab, .btn, form {
                 display: none !important;
             }
             body, .card, .glass-panel {
@@ -341,11 +445,6 @@
                                     <i class="bi bi-stars text-warning"></i> AI Coach
                                 </a>
                             </li>
-                            <!-- <li class="nav-item">
-                                <a class="nav-link" href="{% url 'flashcard_list' %}">
-                                    <i class="bi bi-Collection-play-fill text-info"></i> 3D Flashcards
-                                </a>
-                            </li> -->
                             <li class="nav-item">
                                 <a class="nav-link" href="{% url 'settings' %}">
                                     <i class="bi bi-sliders2-vertical text-secondary"></i> Settings
@@ -354,9 +453,14 @@
                         </ul>
                     </div>
 
-                    <!-- Aura Color Switcher in Sidebar Footer -->
-                    <div class="p-3 rounded-4" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);">
-                        <div class="small text-muted fw-semibold mb-2"><i class="bi bi-palette2 me-1"></i>3D Aura Theme</div>
+                    <!-- Aura Color & Theme Switcher in Sidebar Footer -->
+                    <div class="p-3 rounded-4" style="background: var(--subtle-surface); border: 1px solid var(--glass-border);">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="small text-muted fw-semibold"><i class="bi bi-palette2 me-1"></i>3D Aura</span>
+                            <button type="button" onclick="toggleSiteTheme()" class="btn btn-sm p-0 border-0 text-muted" title="Switch Light/Dark Mode">
+                                <i class="bi bi-sun-fill theme-toggle-icon"></i>
+                            </button>
+                        </div>
                         <div class="d-flex gap-2">
                             <button onclick="setAura('cyber')" class="btn btn-sm w-100 rounded-pill" style="background: linear-gradient(135deg,#6366f1,#ec4899); height: 24px;" title="Cyberpunk"></button>
                             <button onclick="setAura('aurora')" class="btn btn-sm w-100 rounded-pill" style="background: linear-gradient(135deg,#10b981,#3b82f6); height: 24px;" title="Aurora"></button>
@@ -373,24 +477,30 @@
                         <h5 class="m-0 fw-bold">{% block page_title %}Command Center{% endblock %}</h5>
                     </div>
 
-                    <!-- Quick Command Palette Trigger (Ctrl + K) -->
-                    <div class="d-flex align-items-center gap-3">
+                    <!-- Quick Command Palette Trigger (Ctrl + K) & Theme Switch -->
+                    <div class="d-flex align-items-center gap-2 gap-sm-3">
                         <div class="cmd-trigger d-none d-sm-flex align-items-center gap-2" data-bs-toggle="modal" data-bs-target="#cmdModal">
                             <i class="bi bi-search text-info"></i>
                             <span>Quick Jump...</span>
-                            <kbd class="bg-dark border border-secondary px-2 py-0 rounded small">Ctrl K</kbd>
+                            <kbd class="border border-secondary px-2 py-0 rounded small" style="background: var(--subtle-surface); color: var(--text-main);">Ctrl K</kbd>
                         </div>
+
+                        <!-- Light / Dark Mode Switch Button -->
+                        <button type="button" class="theme-pill-btn" onclick="toggleSiteTheme()" title="Toggle Light / Dark Mode">
+                            <i class="bi bi-sun-fill text-warning theme-toggle-icon"></i>
+                            <span class="d-none d-md-inline theme-toggle-label">Light</span>
+                        </button>
 
                         <!-- Student XP / Profile Pill -->
                         <div class="px-3 py-1 rounded-pill d-flex align-items-center gap-2"
-                             style="background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.16);">
-                            <span class="badge rounded-pill" style="background: var(--primary-grad);">PRO</span>
+                             style="background: var(--subtle-surface); border: 1px solid var(--glass-border);">
+                            <span class="badge rounded-pill text-white" style="background: var(--primary-grad);">PRO</span>
                             <span class="small fw-bold">{{ user.username }}</span>
                         </div>
 
                         <form method="post" action="{% url 'logout' %}" class="m-0">
                             {% csrf_token %}
-                            <button type="submit" class="btn btn-outline-light btn-sm rounded-pill px-3">
+                            <button type="submit" class="btn btn-outline-light btn-sm rounded-pill px-3" title="Logout">
                                 <i class="bi bi-power"></i>
                             </button>
                         </form>
@@ -435,17 +545,50 @@
         </div>
     </div>
     {% else %}
+        <!-- Floating Theme Switcher for Public Pages (Landing, Login, Register) -->
+        <button type="button" class="public-theme-fab" onclick="toggleSiteTheme()" aria-label="Toggle Light or Dark Mode">
+            <i class="bi bi-sun-fill text-warning theme-toggle-icon"></i>
+            <span class="theme-toggle-label">Light Mode</span>
+        </button>
+
         {% block public_content %}{% endblock %}
     {% endif %}
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
-        // 1. Set Chart.js Dark Holographic Defaults
-        if (window.Chart) {
-            Chart.defaults.color = '#94a3b8';
-            Chart.defaults.borderColor = 'rgba(255, 255, 255, 0.06)';
+        // 1. Theme Manager (Light / Dark Mode)
+        function applyChartTheme(theme) {
+            if (!window.Chart) return;
+            Chart.defaults.color = theme === 'light' ? '#475569' : '#94a3b8';
+            Chart.defaults.borderColor = theme === 'light' ? 'rgba(15, 23, 42, 0.08)' : 'rgba(255, 255, 255, 0.06)';
         }
+
+        function updateThemeToggleButtons(theme) {
+            document.querySelectorAll('.theme-toggle-icon').forEach(icon => {
+                icon.className = theme === 'dark'
+                    ? 'bi bi-sun-fill text-warning theme-toggle-icon'
+                    : 'bi bi-moon-stars-fill text-primary theme-toggle-icon';
+            });
+            document.querySelectorAll('.theme-toggle-label').forEach(label => {
+                label.textContent = theme === 'dark' ? 'Light Mode' : 'Dark Mode';
+            });
+            applyChartTheme(theme);
+        }
+
+        function toggleSiteTheme() {
+            const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
+            const nextTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', nextTheme);
+            document.documentElement.setAttribute('data-bs-theme', nextTheme);
+            localStorage.setItem('studyos_theme', nextTheme);
+            updateThemeToggleButtons(nextTheme);
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
+            updateThemeToggleButtons(currentTheme);
+        });
 
         // 2. Active Sidebar Highlight
         document.querySelectorAll('#sidebarNav .nav-link').forEach(link => {
@@ -500,8 +643,6 @@
             document.documentElement.setAttribute('data-aura', theme);
             localStorage.setItem('studyos_aura', theme);
         }
-        const savedAura = localStorage.getItem('studyos_aura');
-        if (savedAura) document.documentElement.setAttribute('data-aura', savedAura);
     </script>
     {% block extra_js %}{% endblock %}
 </body>
