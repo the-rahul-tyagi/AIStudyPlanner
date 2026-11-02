@@ -1,37 +1,174 @@
 {% extends 'base.html' %}
+
 {% block title %}Sign In | AI Study Planner{% endblock %}
 
 {% block public_content %}
-<div class="min-vh-100 d-flex align-items-center justify-content-center py-5">
-    <div class="card p-4 shadow-sm" style="max-width: 420px; width: 100%;">
+<style>
+    .auth-card {
+        max-width: 450px;
+        width: 100%;
+        border-radius: 22px;
+        border: 1px solid rgba(255, 255, 255, 0.22);
+        backdrop-filter: blur(18px);
+        -webkit-backdrop-filter: blur(18px);
+        box-shadow: 0 24px 50px rgba(0, 0, 0, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .auth-card:hover {
+        transform: translateY(-4px);
+    }
+
+    .auth-icon-badge {
+        width: 64px;
+        height: 64px;
+        border-radius: 18px;
+        background: linear-gradient(135deg, #6366f1, #06b6d4);
+        color: #ffffff;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.75rem;
+        box-shadow: 0 12px 24px rgba(99, 102, 241, 0.35);
+    }
+
+    .input-wrapper {
+        position: relative;
+    }
+
+    .input-wrapper input {
+        width: 100%;
+        border-radius: 12px !important;
+        padding: 0.68rem 0.95rem !important;
+        transition: all 0.2s ease;
+    }
+
+    .input-wrapper.has-toggle input {
+        padding-right: 2.85rem !important;
+    }
+
+    .password-toggle-btn {
+        position: absolute;
+        right: 10px;
+        top: 50%;
+        transform: translateY(-50%);
+        border: none;
+        background: transparent;
+        color: #64748b;
+        padding: 4px 8px;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: color 0.2s ease, background 0.2s ease;
+        z-index: 5;
+    }
+
+    .password-toggle-btn:hover {
+        color: #6366f1;
+        background: rgba(99, 102, 241, 0.08);
+    }
+
+    .btn-auth-submit {
+        border-radius: 12px;
+        padding: 0.72rem 1.2rem;
+        font-weight: 600;
+        background: linear-gradient(135deg, #6366f1, #4f46e5);
+        border: none;
+        box-shadow: 0 10px 22px rgba(99, 102, 241, 0.32);
+        transition: all 0.25s ease;
+    }
+
+    .btn-auth-submit:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 14px 28px rgba(99, 102, 241, 0.45);
+    }
+</style>
+
+<div class="min-vh-100 d-flex align-items-center justify-content-center py-5 px-3">
+    <div class="card auth-card p-4 p-sm-5">
         <div class="text-center mb-4">
-            <i class="bi bi-mortarboard-fill fs-1 text-primary"></i>
-            <h4 class="fw-bold mt-2">Sign In to StudyPlanner</h4>
-            <p class="text-muted small">Enter your credentials to access your dashboard</p>
+            <div class="auth-icon-badge mb-3">
+                <i class="bi bi-mortarboard-fill"></i>
+            </div>
+            <h4 class="fw-bold mb-1">Welcome Back</h4>
+            <p class="text-muted small mb-0">Sign in to continue your AI study schedule</p>
         </div>
 
-        {% if form.errors %}
-            <div class="alert alert-danger small py-2">
-                Invalid username or password. Please try again.
+        {% if form.non_field_errors %}
+            <div class="alert alert-danger d-flex align-items-center gap-2 py-2 small rounded-3">
+                <i class="bi bi-exclamation-circle-fill"></i>
+                <div>
+                    {% for error in form.non_field_errors %}
+                        {{ error }}
+                    {% endfor %}
+                </div>
             </div>
         {% endif %}
 
-        <form method="post">
+        <form method="post" novalidate>
             {% csrf_token %}
-            <div class="mb-3">
-                <label class="form-label fw-semibold small">Username</label>
-                <input type="text" name="username" class="form-control" required autofocus>
-            </div>
-            <div class="mb-3">
-                <label class="form-label fw-semibold small">Password</label>
-                <input type="password" name="password" class="form-control" required>
-            </div>
-            <button type="submit" class="btn btn-primary w-100 py-2">Sign In</button>
+            {% for field in form %}
+                <div class="mb-3">
+                    <label class="form-label fw-semibold small d-flex align-items-center gap-1" for="{{ field.id_for_label }}">
+                        {% if 'user' in field.name %}
+                            <i class="bi bi-person text-primary"></i>
+                        {% elif 'pass' in field.name %}
+                            <i class="bi bi-lock text-primary"></i>
+                        {% else %}
+                            <i class="bi bi-input-cursor-text text-primary"></i>
+                        {% endif %}
+                        {{ field.label }}
+                    </label>
+
+                    <div class="input-wrapper {% if 'pass' in field.name %}has-toggle{% endif %}">
+                        {{ field }}
+                        {% if 'pass' in field.name %}
+                            <button type="button" class="password-toggle-btn" onclick="togglePasswordVisibility(this)" aria-label="Show or hide password" title="Show/Hide Password">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                        {% endif %}
+                    </div>
+
+                    {% for error in field.errors %}
+                        <div class="text-danger small mt-1">
+                            <i class="bi bi-exclamation-triangle me-1"></i>{{ error }}
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endfor %}
+
+            <button type="submit" class="btn btn-primary btn-auth-submit w-100 mt-2">
+                <i class="bi bi-box-arrow-in-right me-1"></i> Sign In
+            </button>
         </form>
 
-        <div class="text-center mt-3 small">
-            Don't have an account? <a href="{% url 'register' %}" class="text-decoration-none fw-semibold">Register here</a>
+        <div class="text-center mt-4 pt-3 border-top small">
+            <span class="text-muted">Don't have an account?</span>
+            <a href="{% url 'register' %}" class="fw-semibold text-primary text-decoration-none ms-1">Create Account</a>
+            <div class="mt-2">
+                <a href="{% url 'landing' %}" class="text-muted text-decoration-none small">
+                    <i class="bi bi-arrow-left"></i> Back to Home
+                </a>
+            </div>
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function togglePasswordVisibility(btn) {
+        const wrapper = btn.closest('.input-wrapper');
+        const input = wrapper.querySelector('input');
+        const icon = btn.querySelector('i');
+        if (!input) return;
+
+        if (input.type === 'password') {
+            input.type = 'text';
+            icon.classList.replace('bi-eye', 'bi-eye-slash');
+        } else {
+            input.type = 'password';
+            icon.classList.replace('bi-eye-slash', 'bi-eye');
+        }
+    }
+</script>
 {% endblock %}

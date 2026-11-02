@@ -1,35 +1,273 @@
 {% extends 'base.html' %}
+
 {% block title %}Create Account | AI Study Planner{% endblock %}
 
 {% block public_content %}
-<div class="min-vh-100 d-flex align-items-center justify-content-center py-5">
-    <div class="card p-4 shadow-sm" style="max-width: 480px; width: 100%;">
+<style>
+    .auth-card {
+        max-width: 510px;
+        width: 100%;
+        border-radius: 22px;
+        border: 1px solid rgba(255, 255, 255, 0.22);
+        backdrop-filter: blur(18px);
+        -webkit-backdrop-filter: blur(18px);
+        box-shadow: 0 24px 50px rgba(0, 0, 0, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .auth-card:hover {
+        transform: translateY(-4px);
+    }
+
+    .auth-icon-badge {
+        width: 64px;
+        height: 64px;
+        border-radius: 18px;
+        background: linear-gradient(135deg, #6366f1, #06b6d4);
+        color: #ffffff;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.75rem;
+        box-shadow: 0 12px 24px rgba(99, 102, 241, 0.35);
+    }
+
+    .input-wrapper {
+        position: relative;
+    }
+
+    .input-wrapper input {
+        width: 100%;
+        border-radius: 12px !important;
+        padding: 0.68rem 0.95rem !important;
+        transition: all 0.2s ease;
+    }
+
+    .input-wrapper.has-toggle input {
+        padding-right: 2.85rem !important;
+    }
+
+    .password-toggle-btn {
+        position: absolute;
+        right: 10px;
+        top: 50%;
+        transform: translateY(-50%);
+        border: none;
+        background: transparent;
+        color: #64748b;
+        padding: 4px 8px;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: color 0.2s ease, background 0.2s ease;
+        z-index: 5;
+    }
+
+    .password-toggle-btn:hover {
+        color: #6366f1;
+        background: rgba(99, 102, 241, 0.08);
+    }
+
+    .strength-meter-bar {
+        height: 5px;
+        border-radius: 999px;
+        background: rgba(148, 163, 184, 0.25);
+        overflow: hidden;
+        margin-top: 8px;
+    }
+
+    .strength-meter-fill {
+        height: 100%;
+        width: 0%;
+        transition: width 0.3s ease, background-color 0.3s ease;
+    }
+
+    .help-text-box ul {
+        padding-left: 1.1rem;
+        margin-bottom: 0;
+        font-size: 0.76rem;
+    }
+
+    .btn-auth-submit {
+        border-radius: 12px;
+        padding: 0.74rem 1.2rem;
+        font-weight: 600;
+        background: linear-gradient(135deg, #6366f1, #4f46e5);
+        border: none;
+        box-shadow: 0 10px 22px rgba(99, 102, 241, 0.32);
+        transition: all 0.25s ease;
+    }
+
+    .btn-auth-submit:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 14px 28px rgba(99, 102, 241, 0.45);
+    }
+</style>
+
+<div class="min-vh-100 d-flex align-items-center justify-content-center py-5 px-3">
+    <div class="card auth-card p-4 p-sm-5">
         <div class="text-center mb-4">
-            <i class="bi bi-mortarboard-fill fs-1 text-primary"></i>
-            <h4 class="fw-bold mt-2">Create Your Student Account</h4>
-            <p class="text-muted small">Start planning your subjects and exams</p>
+            <div class="auth-icon-badge mb-3">
+                <i class="bi bi-mortarboard-fill"></i>
+            </div>
+            <h4 class="fw-bold mb-1">Create Your Student Account</h4>
+            <p class="text-muted small mb-0">Start planning your subjects, exams, and AI study tasks</p>
         </div>
 
-        <form method="post">
+        {% if form.non_field_errors %}
+            <div class="alert alert-danger d-flex align-items-center gap-2 py-2 small rounded-3">
+                <i class="bi bi-exclamation-circle-fill"></i>
+                <div>
+                    {% for error in form.non_field_errors %}
+                        {{ error }}
+                    {% endfor %}
+                </div>
+            </div>
+        {% endif %}
+
+        <form method="post" novalidate>
             {% csrf_token %}
             {% for field in form %}
                 <div class="mb-3">
-                    <label class="form-label fw-semibold small">{{ field.label }}</label>
-                    {{ field }}
-                    {% if field.help_text %}
-                        <div class="form-text small">{{ field.help_text }}</div>
+                    <label class="form-label fw-semibold small d-flex align-items-center justify-content-between" for="{{ field.id_for_label }}">
+                        <span>
+                            {% if 'user' in field.name %}
+                                <i class="bi bi-person text-primary me-1"></i>
+                            {% elif 'email' in field.name %}
+                                <i class="bi bi-envelope text-primary me-1"></i>
+                            {% elif 'password1' in field.name %}
+                                <i class="bi bi-lock text-primary me-1"></i>
+                            {% elif 'password2' in field.name %}
+                                <i class="bi bi-shield-check text-primary me-1"></i>
+                            {% elif 'goal' in field.name %}
+                                <i class="bi bi-clock-history text-primary me-1"></i>
+                            {% else %}
+                                <i class="bi bi-pencil-square text-primary me-1"></i>
+                            {% endif %}
+                            {{ field.label }}
+                        </span>
+
+                        {% if 'password1' in field.name %}
+                            <span id="pwdStrengthText" class="badge bg-secondary bg-opacity-10 text-secondary fw-normal" style="font-size: 0.7rem;"></span>
+                        {% elif 'password2' in field.name %}
+                            <span id="pwdMatchText" class="small fw-normal" style="font-size: 0.72rem;"></span>
+                        {% endif %}
+                    </label>
+
+                    <div class="input-wrapper {% if 'pass' in field.name %}has-toggle{% endif %}">
+                        {{ field }}
+                        {% if 'pass' in field.name %}
+                            <button type="button" class="password-toggle-btn" onclick="togglePasswordVisibility(this)" aria-label="Show or hide password" title="Show/Hide Password">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                        {% endif %}
+                    </div>
+
+                    {% if 'password1' in field.name %}
+                        <div class="strength-meter-bar">
+                            <div id="pwdStrengthBar" class="strength-meter-fill"></div>
+                        </div>
                     {% endif %}
+
+                    {% if field.help_text %}
+                        <div class="form-text text-muted small help-text-box mt-1" style="font-size: 0.75rem;">
+                            {{ field.help_text|safe }}
+                        </div>
+                    {% endif %}
+
                     {% for error in field.errors %}
-                        <div class="text-danger small mt-1">{{ error }}</div>
+                        <div class="text-danger small mt-1">
+                            <i class="bi bi-exclamation-triangle me-1"></i>{{ error }}
+                        </div>
                     {% endfor %}
                 </div>
             {% endfor %}
-            <button type="submit" class="btn btn-primary w-100 py-2">Register & Continue</button>
+
+            <button type="submit" class="btn btn-primary btn-auth-submit w-100 mt-2">
+                <i class="bi bi-person-plus-fill me-1"></i> Create Account
+            </button>
         </form>
 
-        <div class="text-center mt-3 small">
-            Already have an account? <a href="{% url 'login' %}" class="text-decoration-none fw-semibold">Sign in</a>
+        <div class="text-center mt-4 pt-3 border-top small">
+            <span class="text-muted">Already have an account?</span>
+            <a href="{% url 'login' %}" class="fw-semibold text-primary text-decoration-none ms-1">Sign In</a>
+            <div class="mt-2">
+                <a href="{% url 'landing' %}" class="text-muted text-decoration-none small">
+                    <i class="bi bi-arrow-left"></i> Back to Home
+                </a>
+            </div>
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function togglePasswordVisibility(btn) {
+        const wrapper = btn.closest('.input-wrapper');
+        const input = wrapper.querySelector('input');
+        const icon = btn.querySelector('i');
+        if (!input) return;
+
+        if (input.type === 'password') {
+            input.type = 'text';
+            icon.classList.replace('bi-eye', 'bi-eye-slash');
+        } else {
+            input.type = 'password';
+            icon.classList.replace('bi-eye-slash', 'bi-eye');
+        }
+    }
+
+    // Live Password Strength & Confirm Password Match Check
+    document.addEventListener('DOMContentLoaded', () => {
+        const pwd1 = document.querySelector('input[name="password1"]');
+        const pwd2 = document.querySelector('input[name="password2"]');
+        const bar = document.getElementById('pwdStrengthBar');
+        const strengthText = document.getElementById('pwdStrengthText');
+        const matchText = document.getElementById('pwdMatchText');
+
+        if (pwd1 && bar && strengthText) {
+            pwd1.addEventListener('input', () => {
+                const val = pwd1.value;
+                let score = 0;
+                if (val.length >= 8) score++;
+                if (/[A-Z]/.test(val) && /[a-z]/.test(val)) score++;
+                if (/[0-9]/.test(val)) score++;
+                if (/[^A-Za-z0-9]/.test(val)) score++;
+
+                const configs = [
+                    { width: '0%', color: 'transparent', label: '' },
+                    { width: '25%', color: '#ef4444', label: 'Weak' },
+                    { width: '55%', color: '#f59e0b', label: 'Medium' },
+                    { width: '80%', color: '#3b82f6', label: 'Good' },
+                    { width: '100%', color: '#10b981', label: 'Strong' }
+                ];
+
+                const current = val.length === 0 ? configs[0] : configs[Math.max(1, score)];
+                bar.style.width = current.width;
+                bar.style.backgroundColor = current.color;
+                strengthText.textContent = current.label;
+                checkMatch();
+            });
+        }
+
+        function checkMatch() {
+            if (!pwd1 || !pwd2 || !matchText) return;
+            if (!pwd2.value) {
+                matchText.textContent = '';
+                return;
+            }
+            if (pwd1.value === pwd2.value) {
+                matchText.innerHTML = '<i class="bi bi-check-circle-fill text-success"></i> Passwords match';
+                matchText.className = 'small fw-semibold text-success';
+            } else {
+                matchText.innerHTML = '<i class="bi bi-x-circle-fill text-danger"></i> Does not match';
+                matchText.className = 'small fw-semibold text-danger';
+            }
+        }
+
+        if (pwd2) {
+            pwd2.addEventListener('input', checkMatch);
+        }
+    });
+</script>
 {% endblock %}
