@@ -54,4 +54,6 @@ urlpatterns = [
     # Stage 3: Interactive Calendar & Adaptive Calibration
     path('calendar/', views.calendar_view, name='calendar_view'),
     path('subjects/<int:subject_pk>/calibrate/', views.apply_adaptive_estimate_view, name='apply_adaptive_estimate'),
+
+    path('forgot-password/', views.forgot_password_view, name='forgot_password'),
 ]

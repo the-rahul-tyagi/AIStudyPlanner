@@ -5,6 +5,11 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.utils import timezone
 from django.db.models import Sum
+from django.contrib.auth.models import User
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError
+
+
 
 from .forms import (
     StudentRegistrationForm, StudentProfileForm,
@@ -27,6 +32,7 @@ from .services import (
 )
 
 import re
+
 
 
 def landing_view(request):
@@ -841,3 +847,34 @@ def apply_adaptive_estimate_view(request, subject_pk):
             f"Calibrated pending tasks & topics in {subject.name} to {new_minutes} mins based on your study history!"
         )
     return redirect('calendar_view')
+
+def forgot_password_view(request):
+    if request.user.is_authenticated:
+        return redirect('dashboard')
+
+    if request.method == 'POST':
+        username = request.POST.get('username', '').strip()
+        email = request.POST.get('email', '').strip()
+        new_password1 = request.POST.get('new_password1', '')
+        new_password2 = request.POST.get('new_password2', '')
+
+        if not username or not email or not new_password1 or not new_password2:
+            messages.error(request, 'Please fill in all fields.')
+        elif new_password1 != new_password2:
+            messages.error(request, 'New passwords do not match.')
+        else:
+            user = User.objects.filter(username__iexact=username, email__iexact=email).first()
+            if not user:
+                messages.error(request, 'No student account found matching that Username and Email.')
+            else:
+                try:
+                    validate_password(new_password1, user=user)
+                    user.set_password(new_password1)
+                    user.save()
+                    messages.success(request, 'Password reset successful! You can now sign in with your new password.')
+                    return redirect('login')
+                except ValidationError as e:
+                    for err in e.messages:
+                        messages.error(request, err)
+
+    return render(request, 'registration/forgot_password.html')
