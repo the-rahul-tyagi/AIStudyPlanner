@@ -1,105 +1,213 @@
 {% extends 'base.html' %}
-{% block title %}Interactive Study Calendar | StudyOS{% endblock %}
-{% block page_title %}Interactive Calendar & Adaptive Time Insights{% endblock %}
+{% block title %}Calendar | StudyOS{% endblock %}
+{% block page_title %}Study Calendar{% endblock %}
 
 {% block content %}
 <style>
-    /* FullCalendar Dark Glass Customization */
-    .fc {
-        color: #f8fafc;
-        font-family: 'Plus Jakarta Sans', sans-serif;
+    body {
+        perspective: none !important;
     }
-    .fc-theme-standard td, .fc-theme-standard th, .fc-theme-standard .fc-scrollgrid {
-        border-color: rgba(255, 255, 255, 0.1) !important;
+    .modal-backdrop {
+        backdrop-filter: blur(6px);
+    }
+
+    /* Clean Glassmorphic FullCalendar Overrides */
+    .fc {
+        --fc-border-color: var(--glass-border);
+        --fc-page-bg-color: transparent;
+        --fc-neutral-bg-color: var(--subtle-surface);
+        --fc-list-event-hover-bg-color: var(--nav-link-hover-bg);
+        --fc-today-bg-color: color-mix(in srgb, var(--accent-1) 12%, transparent);
+        color: var(--text-main);
+    }
+    .fc .fc-toolbar-title {
+        font-family: 'Space Grotesk', sans-serif;
+        font-size: 1.25rem;
+        font-weight: 700;
     }
     .fc .fc-button-primary {
-        background: var(--primary-grad) !important;
-        border: none !important;
-        border-radius: 0.65rem !important;
+        background: var(--subtle-surface);
+        border: 1px solid var(--glass-border);
+        color: var(--text-main);
+        border-radius: 999px;
+        padding: 0.35rem 0.85rem;
+        font-size: 0.82rem;
         font-weight: 600;
+        text-transform: capitalize;
     }
-    .fc-day-today {
-        background: rgba(168, 85, 247, 0.14) !important;
+    .fc .fc-button-primary:hover,
+    .fc .fc-button-primary:not(:disabled).fc-button-active {
+        background: var(--primary-grad);
+        border-color: transparent;
+        color: #ffffff;
+    }
+    .fc .fc-col-header-cell-cushion,
+    .fc .fc-daygrid-day-number {
+        color: var(--text-main);
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 0.85rem;
     }
     .fc-event {
-        border-radius: 6px !important;
-        padding: 2px 5px !important;
-        font-size: 0.78rem !important;
         border: none !important;
+        border-radius: 8px !important;
+        padding: 2px 6px !important;
+        font-size: 0.78rem !important;
+        font-weight: 600;
+        cursor: pointer;
     }
 </style>
 
-<!-- Adaptive Personalization Banner (If actual session time > planned time) -->
-{% if recommendations %}
-<div class="card p-4 mb-4 border-warning">
-    <div class="d-flex align-items-center gap-2 mb-2">
-        <i class="bi bi-cpu-fill text-warning fs-5"></i>
-        <h6 class="fw-bold m-0">Adaptive Study Time Recommendations</h6>
+<div class="container-fluid px-0">
+
+    <!-- Clean Top Filter & Action Bar -->
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+        <!-- Event Type Filter Pills -->
+        <div class="d-flex flex-wrap align-items-center gap-2">
+            <button type="button" class="btn btn-sm btn-primary rounded-pill px-3 cal-filter-btn active" onclick="filterCalendar('all', this)">
+                All
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-3 cal-filter-btn" onclick="filterCalendar('exam', this)">
+                <span class="d-inline-block rounded-circle me-1" style="width:8px;height:8px;background:#ef4444;"></span> Exams
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-3 cal-filter-btn" onclick="filterCalendar('task', this)">
+                <span class="d-inline-block rounded-circle me-1" style="width:8px;height:8px;background:#10b981;"></span> Tasks
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-3 cal-filter-btn" onclick="filterCalendar('plan', this)">
+                <span class="d-inline-block rounded-circle me-1" style="width:8px;height:8px;background:#a855f7;"></span> Plan
+            </button>
+        </div>
+
+        <!-- Quick Actions + Adaptive AI Calibration Trigger -->
+        <div class="d-flex flex-wrap align-items-center gap-2">
+            <button type="button" class="btn btn-outline-warning btn-sm rounded-pill px-3"
+                    data-bs-toggle="modal" data-bs-target="#calibrationModal">
+                <i class="bi bi-sliders me-1"></i> AI Calibration
+                {% if recommendations %}
+                    <span class="badge rounded-pill bg-warning text-dark ms-1">{{ recommendations|length }}</span>
+                {% endif %}
+            </button>
+
+            <a href="{% url 'task_list' %}" class="btn btn-outline-secondary btn-sm rounded-pill px-3">
+                <i class="bi bi-plus-lg me-1"></i> Task
+            </a>
+            <a href="{% url 'study_plan' %}" class="btn btn-primary btn-sm rounded-pill px-3">
+                <i class="bi bi-lightning-charge-fill me-1"></i> Smart Plan
+            </a>
+        </div>
     </div>
-    <p class="text-muted small mb-3">
-        Based on your logged study sessions, you spend more time per session on the following subject(s) than your current task estimates:
-    </p>
-    <div class="row g-3">
-        {% for rec in recommendations %}
-            <div class="col-md-6">
-                <div class="p-3 rounded-4 d-flex justify-content-between align-items-center"
-                     style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12);">
-                    <div>
-                        <div class="fw-bold" style="color: {{ rec.subject.color }};">{{ rec.subject.name }}</div>
-                        <small class="text-muted">
-                            Planned Avg: <strong>{{ rec.avg_planned }}m</strong> • Actual Avg: <strong>{{ rec.avg_actual }}m</strong>
-                        </small>
-                    </div>
-                    <form method="post" action="{% url 'apply_adaptive_estimate' rec.subject.pk %}" class="m-0">
-                        {% csrf_token %}
-                        <input type="hidden" name="suggested_minutes" value="{{ rec.suggested_minutes }}">
-                        <button type="submit" class="btn btn-sm btn-warning text-dark fw-semibold rounded-pill px-3">
-                            Auto-Calibrate to {{ rec.suggested_minutes }}m
-                        </button>
-                    </form>
-                </div>
-            </div>
-        {% endfor %}
+
+    <!-- Full-Width Clean Calendar Card -->
+    <div class="card p-3 p-md-4">
+        <div id="studyCalendar"></div>
     </div>
 </div>
-{% endif %}
 
-<!-- Interactive Calendar Card -->
-<div class="card p-4">
-    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-        <div class="d-flex gap-3 small">
-            <span><i class="bi bi-circle-fill text-danger me-1"></i>Exams</span>
-            <span><i class="bi bi-circle-fill text-primary me-1"></i>Pending Tasks</span>
-            <span><i class="bi bi-circle-fill text-success me-1"></i>Completed Tasks</span>
-            <span><i class="bi bi-circle-fill me-1" style="color: #a855f7;"></i>Scheduled Plan Blocks</span>
+<!-- Centered Pop-Up Modal: Adaptive AI Time Calibration -->
+<div class="modal fade" id="calibrationModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content glass-panel p-3 border-0 shadow-lg">
+            <div class="modal-header border-0 pb-2">
+                <h5 class="modal-title fw-bold">
+                    <i class="bi bi-cpu-fill text-warning me-2"></i>Adaptive Time Calibration
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="small text-muted mb-3">
+                    Based on your logged study sessions, StudyOS adjusts your estimated task durations to match your real pace.
+                </p>
+
+                {% if recommendations %}
+                    <div class="list-group list-group-flush">
+                        {% for rec in recommendations %}
+                            <div class="list-group-item d-flex align-items-center justify-content-between gap-3 py-3 px-1">
+                                <div>
+                                    <div class="fw-semibold">{{ rec.subject.name|default:rec.subject_name }}</div>
+                                    <div class="small text-muted">
+                                        Suggested: <strong class="text-warning">{{ rec.suggested_minutes }} mins</strong>
+                                        {% if rec.reason %} · {{ rec.reason }}{% endif %}
+                                    </div>
+                                </div>
+                                <form method="post" action="{% url 'apply_adaptive_estimate' rec.subject.id|default:rec.subject_id %}" class="m-0">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="suggested_minutes" value="{{ rec.suggested_minutes }}">
+                                    <button type="submit" class="btn btn-sm btn-primary rounded-pill px-3 text-nowrap">
+                                        Apply
+                                    </button>
+                                </form>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center py-4 text-muted">
+                        <i class="bi bi-check2-circle fs-2 d-block mb-2 opacity-50"></i>
+                        <p class="small mb-0">Log a few study sessions first to unlock personalized time calibration.</p>
+                    </div>
+                {% endif %}
+            </div>
+            <div class="modal-footer border-0 pt-2">
+                <button type="button" class="btn btn-outline-secondary rounded-pill px-4" data-bs-dismiss="modal">Close</button>
+            </div>
         </div>
-        <button type="button" onclick="window.print()" class="btn btn-sm btn-outline-info rounded-pill px-3">
-            <i class="bi bi-printer me-1"></i> Print / Save Schedule as PDF
-        </button>
     </div>
-
-    <div id="studyCalendar" style="min-height: 620px;"></div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
-<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const calendarEl = document.getElementById('studyCalendar');
-        if (!calendarEl) return;
+let calendarInstance = null;
+const allEvents = {{ events_json|default:"[]"|safe }};
 
-        const calendar = new FullCalendar.Calendar(calendarEl, {
-            initialView: 'dayGridMonth',
-            headerToolbar: {
-                left: 'prev,next today',
-                center: 'title',
-                right: 'dayGridMonth,dayGridWeek,listWeek'
-            },
-            events: {{ events_json|safe }},
-            height: 'auto'
-        });
-        calendar.render();
+document.addEventListener('DOMContentLoaded', () => {
+    const modal = document.getElementById('calibrationModal');
+    if (modal) document.body.appendChild(modal);
+
+    const calendarEl = document.getElementById('studyCalendar');
+    if (!calendarEl) return;
+
+    calendarInstance = new FullCalendar.Calendar(calendarEl, {
+        initialView: 'dayGridMonth',
+        height: 'auto',
+        dayMaxEvents: 3,
+        headerToolbar: {
+            left: 'prev,next today',
+            center: 'title',
+            right: 'dayGridMonth,listWeek'
+        },
+        events: allEvents,
+        eventClick: function(info) {
+            if (info.event.url) {
+                info.jsEvent.preventDefault();
+                window.location.href = info.event.url;
+            }
+        }
     });
+
+    calendarInstance.render();
+});
+
+function filterCalendar(type, btn) {
+    document.querySelectorAll('.cal-filter-btn').forEach(b => {
+        b.classList.remove('btn-primary', 'active');
+        b.classList.add('btn-outline-secondary');
+    });
+    btn.classList.remove('btn-outline-secondary');
+    btn.classList.add('btn-primary', 'active');
+
+    const filtered = allEvents.filter(ev => {
+        if (type === 'all') return true;
+        if (type === 'exam') return ev.url === '/exams/';
+        if (type === 'task') return ev.url === '/tasks/';
+        if (type === 'plan') return ev.url === '/plan/';
+        return true;
+    });
+
+    if (calendarInstance) {
+        calendarInstance.removeAllEvents();
+        calendarInstance.addEventSource(filtered);
+    }
+}
 </script>
 {% endblock %}

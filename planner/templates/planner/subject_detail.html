@@ -1,128 +1,199 @@
 {% extends 'base.html' %}
-{% block title %}{{ subject.name }} - Topics | AI Study Planner{% endblock %}
-{% block page_title %}{{ subject.name }} — Topics & Syllabus{% endblock %}
+{% block title %}{{ subject.name }} | StudyOS{% endblock %}
+{% block page_title %}{{ subject.name }}{% endblock %}
 
 {% block content %}
-<div class="mb-3">
-    <a href="{% url 'subject_list' %}" class="btn btn-sm btn-outline-light rounded-pill px-3">
-        <i class="bi bi-arrow-left me-1"></i> Back to My Subjects
-    </a>
-</div>
+<style>
+    body {
+        perspective: none !important;
+    }
+    .modal-backdrop {
+        backdrop-filter: blur(6px);
+    }
+</style>
 
-<div class="row g-4">
-    <!-- Left Column: Add Single Topic & Bulk Syllabus Importer -->
-    <div class="col-lg-4">
-        <!-- 1. Add Single Topic Form -->
-        <div class="card p-4">
-            <h6 class="fw-bold mb-3"><i class="bi bi-plus-circle me-2 text-primary"></i>Add Topic to {{ subject.name }}</h6>
-            <form method="post">
-                {% csrf_token %}
-                <div class="mb-3">
-                    <label class="form-label small fw-semibold">Topic Title</label>
-                    {{ form.title }}
+<div class="container-fluid px-0" style="max-width: 960px;">
+
+    <!-- Subject Header Card -->
+    <div class="card p-4 mb-4" style="border-top: 3px solid {{ subject.color|default:'#6366f1' }} !important;">
+        <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+            <div>
+                <a href="{% url 'subject_list' %}" class="text-decoration-none small text-muted d-inline-flex align-items-center mb-2">
+                    <i class="bi bi-arrow-left me-1"></i> Back to Subjects
+                </a>
+                <div class="d-flex align-items-center gap-2 mb-1">
+                    <span class="rounded-circle flex-shrink-0"
+                          style="width: 14px; height: 14px; background: {{ subject.color|default:'#6366f1' }}; box-shadow: 0 0 12px {{ subject.color|default:'#6366f1' }};">
+                    </span>
+                    <h3 class="fw-bold mb-0">{{ subject.name }}</h3>
                 </div>
-                <div class="mb-3">
-                    <label class="form-label small fw-semibold">Difficulty</label>
-                    {{ form.difficulty }}
-                </div>
-                <div class="mb-3">
-                    <label class="form-label small fw-semibold">Estimated Study Minutes</label>
-                    {{ form.estimated_minutes }}
-                </div>
-                <div class="mb-3">
-                    <label class="form-label small fw-semibold">Notes</label>
-                    {{ form.notes }}
-                </div>
-                <button type="submit" class="btn btn-primary w-100">
+                <p class="text-muted small mb-0">{{ subject.description|default:"No description added yet." }}</p>
+            </div>
+
+            <div class="d-flex align-items-center gap-2">
+                <button type="button" class="btn btn-primary btn-sm rounded-pill px-3"
+                        data-bs-toggle="modal" data-bs-target="#addTopicModal">
                     <i class="bi bi-plus-lg me-1"></i> Add Topic
                 </button>
-            </form>
-        </div>
-
-        <!-- 2. Bulk Syllabus Importer Card -->
-        <div class="card p-4 mt-4">
-            <h6 class="fw-bold mb-2"><i class="bi bi-file-earmark-plus me-2 text-info"></i>Bulk Syllabus Importer</h6>
-            <p class="text-muted small mb-3">Paste multiple syllabus topics (one per line) to add them all in one click.</p>
-            <form method="post" action="{% url 'bulk_import_topics' subject.pk %}">
-                {% csrf_token %}
-                <div class="mb-3">
-                    <textarea name="raw_syllabus" class="form-control" rows="4" placeholder="1. Introduction to Relational Model
-2. SQL Joins & Subqueries
-3. Normalization (1NF to BCNF)
-4. Transaction & Concurrency Control" required></textarea>
-                </div>
-                <div class="row g-2 mb-3">
-                    <div class="col-6">
-                        <label class="form-label small fw-semibold">Default Difficulty</label>
-                        <select name="default_difficulty" class="form-select form-select-sm">
-                            <option value="easy">Easy</option>
-                            <option value="medium" selected>Medium</option>
-                            <option value="hard">Hard</option>
-                        </select>
-                    </div>
-                    <div class="col-6">
-                        <label class="form-label small fw-semibold">Mins / Topic</label>
-                        <input type="number" name="default_minutes" class="form-control form-control-sm" value="45" min="10">
-                    </div>
-                </div>
-                <button type="submit" class="btn btn-outline-info w-100 rounded-pill">
-                    <i class="bi bi-cloud-upload me-1"></i> Bulk Create Topics
-                </button>
-            </form>
+                <a href="{% url 'study_plan' %}" class="btn btn-outline-primary btn-sm rounded-pill px-3">
+                    Study <i class="bi bi-arrow-right ms-1"></i>
+                </a>
+            </div>
         </div>
     </div>
 
-    <!-- Right Column: Topics List -->
-    <div class="col-lg-8">
-        <div class="card p-4 h-100">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h6 class="fw-bold m-0"><i class="bi bi-list-check me-2 text-info"></i>Syllabus Topics ({{ topics.count }})</h6>
-                <span class="badge rounded-pill bg-success px-3 py-2">{{ subject.progress_percentage }}% Completed</span>
-            </div>
+    <!-- Search Bar -->
+    <div class="d-flex justify-content-between align-items-center gap-2 mb-3">
+        <span class="badge rounded-pill bg-primary bg-opacity-10 text-primary px-3 py-2">
+            <i class="bi bi-list-check me-1"></i> {{ subject.topics.count }} Topics
+        </span>
+        <input type="text" id="topicSearch" class="form-control form-control-sm"
+               placeholder="Search topics..." onkeyup="filterTopics()" style="max-width: 240px;">
+    </div>
 
-            <!-- Subject Progress Bar -->
-            <div class="progress mb-4" style="height: 10px;">
-                <div class="progress-bar" role="progressbar"
-                     style="width: {{ subject.progress_percentage }}%; background: linear-gradient(90deg, {{ subject.color }}, #a855f7);">
-                </div>
-            </div>
-
-            {% if topics %}
-                <div class="list-group list-group-flush">
-                    {% for topic in topics %}
-                        <div class="list-group-item px-0 py-3 d-flex justify-content-between align-items-center">
-                            <div class="d-flex align-items-center gap-3">
-                                <form method="post" action="{% url 'topic_toggle' topic.pk %}" class="m-0">
-                                    {% csrf_token %}
-                                    <button type="submit" class="btn btn-sm rounded-circle {% if topic.is_completed %}btn-success{% else %}btn-outline-info{% endif %}" title="Toggle Completion">
-                                        <i class="bi {% if topic.is_completed %}bi-check-lg{% else %}bi-circle{% endif %}"></i>
-                                    </button>
-                                </form>
-                                <div>
-                                    <div class="fw-semibold {% if topic.is_completed %}text-decoration-line-through text-muted{% endif %}">
-                                        {{ topic.title }}
-                                    </div>
-                                    <small class="text-muted">
-                                        Difficulty: <span class="badge rounded-pill {% if topic.difficulty == 'hard' %}bg-danger-subtle text-danger{% elif topic.difficulty == 'medium' %}bg-warning-subtle text-warning{% else %}bg-info-subtle text-info{% endif %} text-capitalize">{{ topic.difficulty }}</span>
-                                        • Est. <strong>{{ topic.estimated_minutes }} mins</strong>
-                                        {% if topic.notes %} • {{ topic.notes }}{% endif %}
-                                    </small>
-                                </div>
-                            </div>
-                            <div class="d-flex gap-2">
-                                <a href="{% url 'topic_edit' topic.pk %}" class="btn btn-sm btn-outline-light rounded-pill px-3">Edit</a>
-                                <a href="{% url 'topic_delete' topic.pk %}" class="btn btn-sm btn-outline-danger rounded-pill px-3">Delete</a>
-                            </div>
+    <!-- Clean Topics List -->
+    <div class="card p-2 p-md-3">
+        {% if subject.topics.all %}
+            <div class="list-group list-group-flush" id="topicList">
+                {% for topic in subject.topics.all %}
+                    <div class="list-group-item d-flex align-items-center justify-content-between gap-3 py-3 px-2 px-md-3 topic-row"
+                         data-title="{{ topic.title|lower }}">
+                        <div class="d-flex align-items-center gap-3 overflow-hidden">
+                            <span class="rounded-circle flex-shrink-0"
+                                  style="width: 8px; height: 8px; background: {{ subject.color|default:'#6366f1' }};">
+                            </span>
+                            <span class="fw-semibold text-truncate">{{ topic.title }}</span>
                         </div>
-                    {% endfor %}
+
+                        <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                            {% if topic.difficulty %}
+                                <span class="badge rounded-pill bg-secondary bg-opacity-25 text-capitalize">
+                                    {{ topic.difficulty }}
+                                </span>
+                            {% endif %}
+
+                            <button type="button" class="btn btn-sm btn-link text-muted p-1" title="Edit Topic"
+                                    onclick="openEditTopicModal('{% url 'edit_topic' topic.id %}', '{{ topic.title|escapejs }}', '{{ topic.difficulty|default:'Medium'|escapejs }}')">
+                                <i class="bi bi-pencil-square"></i>
+                            </button>
+
+                            <form method="post" action="{% url 'delete_topic' topic.id %}" class="m-0"
+                                  onsubmit="return confirm('Delete topic "{{ topic.title|escapejs }}"?');">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-sm btn-link text-danger p-1" title="Delete Topic">
+                                    <i class="bi bi-trash3"></i>
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="text-center py-5 text-muted">
+                <i class="bi bi-journal-plus fs-1 d-block mb-2 opacity-50"></i>
+                <p class="mb-3">No topics added for {{ subject.name }} yet.</p>
+                <button type="button" class="btn btn-primary btn-sm rounded-pill px-4"
+                        data-bs-toggle="modal" data-bs-target="#addTopicModal">
+                    Add your first topic
+                </button>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Centered Pop-Up Modal: Add Topic -->
+<div class="modal fade" id="addTopicModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content glass-panel p-3 border-0 shadow-lg">
+            <div class="modal-header border-0 pb-2">
+                <h5 class="modal-title fw-bold"><i class="bi bi-plus-circle text-primary me-2"></i>Add Topic to {{ subject.name }}</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post">
+                {% csrf_token %}
+                <div class="modal-body">
+                    {% if form %}
+                        {{ form.as_p }}
+                    {% else %}
+                        <div class="mb-3">
+                            <label class="form-label small fw-semibold">Topic Title</label>
+                            <input type="text" name="title" class="form-control" placeholder="e.g., Binary Search Trees" required>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label small fw-semibold">Difficulty</label>
+                            <select name="difficulty" class="form-select">
+                                <option value="Easy">Easy</option>
+                                <option value="Medium" selected>Medium</option>
+                                <option value="Hard">Hard</option>
+                            </select>
+                        </div>
+                    {% endif %}
                 </div>
-            {% else %}
-                <div class="text-center py-5 text-muted my-auto">
-                    <i class="bi bi-journal-code fs-1 d-block mb-2 text-info"></i>
-                    <p class="small mb-0">No topics added for this subject yet. Add a single topic or use the <strong>Bulk Syllabus Importer</strong> on the left!</p>
+                <div class="modal-footer border-0 pt-2">
+                    <button type="button" class="btn btn-outline-secondary rounded-pill px-3" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary rounded-pill px-4">Add Topic</button>
                 </div>
-            {% endif %}
+            </form>
         </div>
     </div>
 </div>
+
+<!-- Centered Pop-Up Modal: Edit Topic -->
+<div class="modal fade" id="editTopicModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content glass-panel p-3 border-0 shadow-lg">
+            <div class="modal-header border-0 pb-2">
+                <h5 class="modal-title fw-bold"><i class="bi bi-pencil-square text-primary me-2"></i>Edit Topic</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" id="editTopicForm">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">Topic Title</label>
+                        <input type="text" name="title" id="editTopicTitle" class="form-control" required>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label small fw-semibold">Difficulty</label>
+                        <select name="difficulty" id="editTopicDifficulty" class="form-select">
+                            <option value="Easy">Easy</option>
+                            <option value="Medium">Medium</option>
+                            <option value="Hard">Hard</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 pt-2">
+                    <button type="button" class="btn btn-outline-secondary rounded-pill px-3" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary rounded-pill px-4">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    ['addTopicModal', 'editTopicModal'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) document.body.appendChild(el);
+    });
+});
+
+function openEditTopicModal(actionUrl, title, difficulty) {
+    document.getElementById('editTopicForm').action = actionUrl;
+    document.getElementById('editTopicTitle').value = title;
+    const diffSelect = document.getElementById('editTopicDifficulty');
+    if (diffSelect && difficulty) diffSelect.value = difficulty;
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('editTopicModal')).show();
+}
+
+function filterTopics() {
+    const query = document.getElementById('topicSearch').value.toLowerCase();
+    document.querySelectorAll('.topic-row').forEach(row => {
+        row.style.display = row.dataset.title.includes(query) ? '' : 'none';
+    });
+}
+</script>
 {% endblock %}

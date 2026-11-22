@@ -1,267 +1,370 @@
 {% extends 'base.html' %}
-{% block title %}AI Study Assistant | AI Study Planner{% endblock %}
-{% block page_title %}AI Study Coach & Interactive Quiz Studio{% endblock %}
+{% block title %}AI Coach | StudyOS{% endblock %}
+{% block page_title %}AI Study Coach{% endblock %}
 
 {% block content %}
-<div class="row g-4">
-    <div class="col-lg-5">
-        <!-- AI Prompt Form -->
-        <div class="card p-4 mb-4">
-            <h6 class="fw-bold mb-2"><i class="bi bi-stars text-warning me-2"></i>Request AI Study Assistance</h6>
-            <form method="post">
-                {% csrf_token %}
-                <div class="mb-3">
-                    <label class="form-label small fw-semibold">Subject</label>
-                    <select name="subject_name" class="form-select">
-                        {% for s in subjects %}
-                            <option value="{{ s.name }}">{{ s.name }}</option>
-                        {% empty %}
-                            <option value="General Studies">General Studies</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label small fw-semibold">Topic Title</label>
-                    <input type="text" name="topic_title" class="form-control" placeholder="e.g., Deadlocks in OS" value="{{ tested_topic_title }}" required>
-                </div>
-                <div class="row g-2 mb-3">
-                    <div class="col-6">
-                        <label class="form-label small fw-semibold">Difficulty</label>
-                        <select name="difficulty" class="form-select">
-                            <option value="easy">Easy</option>
-                            <option value="medium" selected>Medium</option>
-                            <option value="hard">Hard</option>
-                        </select>
-                    </div>
-                    <div class="col-6">
-                        <label class="form-label small fw-semibold">Time Limit (Mins)</label>
-                        <input type="number" name="minutes" class="form-control" value="45" min="15" max="240">
-                    </div>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label small fw-semibold">AI Mode</label>
-                    <select name="request_type" class="form-select">
-                        <option value="strategy">Step-by-Step Revision Strategy</option>
-                        <option value="breakdown">Break Topic into Smaller Study Tasks</option>
-                        <option value="quiz">Interactive MCQ Quiz (Auto-Graded)</option>
-                        <option value="explain">Explain Concept with Analogy & Example</option>
-                        <option value="summarize">Summarize My Study Notes</option>
-                    </select>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label small fw-semibold">Optional Notes (For "Summarize My Study Notes" mode)</label>
-                    <textarea name="notes_text" class="form-control" rows="2" placeholder="Paste lecture notes here if summarizing..."></textarea>
-                </div>
-                <button type="submit" class="btn btn-primary w-100">
-                    <i class="bi bi-magic me-1"></i> Generate Study Guidance
-                </button>
-            </form>
+<style>
+    body {
+        perspective: none !important;
+    }
+    .modal-backdrop {
+        backdrop-filter: blur(6px);
+    }
+    .ai-output-box {
+        white-space: pre-wrap;
+        line-height: 1.7;
+        font-size: 0.94rem;
+    }
+    .quiz-option-btn {
+        text-align: left;
+        transition: all 0.2s ease;
+    }
+    .quiz-option-btn.selected {
+        border-color: var(--accent-1) !important;
+        background: color-mix(in srgb, var(--accent-1) 18%, transparent) !important;
+    }
+</style>
+
+<div class="container-fluid px-0">
+
+    <!-- Clean Top Action Bar -->
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+        <div class="d-flex align-items-center gap-2">
+            <span class="badge rounded-pill bg-primary bg-opacity-10 text-primary px-3 py-2">
+                <i class="bi bi-stars me-1"></i> AI Study Assistant
+            </span>
+            <span class="small text-muted d-none d-md-inline">Generate strategies, summaries, or interactive quizzes in seconds.</span>
         </div>
 
-        <!-- Quiz Score Logger -->
-        <div class="card p-4">
-            <h6 class="fw-bold mb-3"><i class="bi bi-patch-check me-2 text-success"></i>Record Quiz Result</h6>
-            <form method="post" action="{% url 'log_quiz_attempt' %}" id="quizScoreForm">
-                {% csrf_token %}
-                <div class="mb-2">
-                    <label class="form-label small fw-semibold">Subject</label>
-                    <select name="subject" id="quizSubjectSelect" class="form-select form-select-sm" required>
-                        {% for s in subjects %}
-                            <option value="{{ s.pk }}" {% if s.pk == selected_subject_pk %}selected{% endif %}>{{ s.name }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="mb-2">
-                    <label class="form-label small fw-semibold">Topic Tested</label>
-                    <input type="text" name="topic_title" id="quizTopicInput" class="form-control form-control-sm" value="{{ tested_topic_title }}" placeholder="e.g., Normalization Quiz" required>
-                </div>
-                <div class="row g-2 mb-3">
-                    <div class="col-6">
-                        <label class="form-label small fw-semibold">Correct Answers</label>
-                        <input type="number" name="score" id="quizScoreInput" class="form-control form-control-sm" value="3" min="0" required>
-                    </div>
-                    <div class="col-6">
-                        <label class="form-label small fw-semibold">Total Questions</label>
-                        <input type="number" name="total_questions" id="quizTotalInput" class="form-control form-control-sm" value="3" min="1" required>
-                    </div>
-                </div>
-                <button type="submit" class="btn btn-success btn-sm w-100">Save Quiz Score</button>
-            </form>
+        <div class="d-flex align-items-center gap-2">
+            <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3"
+                    data-bs-toggle="modal" data-bs-target="#quizHistoryModal">
+                <i class="bi bi-trophy me-1"></i> Quiz History ({{ quiz_attempts|length }})
+            </button>
+            <a href="{% url 'flashcard_list' %}" class="btn btn-outline-primary btn-sm rounded-pill px-3">
+                <i class="bi bi-collection-play me-1"></i> 3D Flashcards
+            </a>
         </div>
     </div>
 
-    <div class="col-lg-7">
-        {% if interactive_quiz_json %}
-        <!-- Interactive Auto-Graded Quiz Card -->
-        <div class="card p-4 mb-4 border-info">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h6 class="fw-bold m-0"><i class="bi bi-controller me-2 text-info"></i>Interactive Practice Quiz: {{ tested_topic_title }}</h6>
-                <span id="liveQuizScoreBadge" class="badge rounded-pill bg-info text-dark px-3 py-2">Select answers below</span>
-            </div>
-            <div id="interactiveQuizContainer" class="d-flex flex-column gap-3 mb-3"></div>
-            <div class="d-flex gap-2">
-                <button type="button" class="btn btn-primary w-100" onclick="gradeInteractiveQuiz()">
-                    <i class="bi bi-check2-circle me-1"></i> Grade My Answers & Auto-Fill Score
-                </button>
+    <!-- Main 2-Column Workspace -->
+    <div class="row g-4">
+
+        <!-- LEFT: Clean AI Prompt Builder -->
+        <div class="col-lg-5">
+            <div class="card p-4 h-100">
+                <h5 class="fw-bold mb-3"><i class="bi bi-sliders text-primary me-2"></i>What do you need help with?</h5>
+
+                <form method="post" id="aiCoachForm" onsubmit="showAiLoading()">
+                    {% csrf_token %}
+
+                    <!-- Mode Selector -->
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold mb-1">Mode</label>
+                        <select name="request_type" id="requestTypeSelect" class="form-select" onchange="toggleNotesField()">
+                            <option value="strategy">🎯 Study Strategy & Action Plan</option>
+                            <option value="quiz">📝 Interactive Practice Quiz</option>
+                            <option value="summary">📄 Summarize My Notes</option>
+                            <option value="revision">⚡ Quick Revision Sheet</option>
+                        </select>
+                    </div>
+
+                    <!-- Subject Dropdown -->
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold mb-1">Subject</label>
+                        <select name="subject_name" id="aiSubjectSelect" class="form-select" onchange="updateTopicSuggestions()">
+                            {% if subjects %}
+                                {% for subj in subjects %}
+                                    <option value="{{ subj.name }}" data-id="{{ subj.id }}"
+                                            {% if selected_subject_pk == subj.id %}selected{% endif %}>
+                                        {{ subj.name }}
+                                    </option>
+                                {% endfor %}
+                            {% else %}
+                                <option value="General Study">General Study</option>
+                            {% endif %}
+                        </select>
+                    </div>
+
+                    <!-- Topic Title with Autocomplete from Subject's Topics -->
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold mb-1">Topic</label>
+                        <input type="text" name="topic_title" id="aiTopicInput" class="form-control"
+                               list="topicSuggestions" value="{{ tested_topic_title|default:'' }}"
+                               placeholder="e.g., Binary Search Trees, Normalization" required>
+                        <datalist id="topicSuggestions"></datalist>
+                    </div>
+
+                    <!-- Difficulty + Time Budget -->
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="form-label small fw-semibold mb-1">Difficulty</label>
+                            <select name="difficulty" class="form-select">
+                                <option value="easy">Easy</option>
+                                <option value="medium" selected>Medium</option>
+                                <option value="hard">Hard</option>
+                            </select>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small fw-semibold mb-1">Time (Mins)</label>
+                            <input type="number" name="minutes" class="form-control" value="45" min="10" max="240">
+                        </div>
+                    </div>
+
+                    <!-- Optional Notes (Auto-shows for Summary, collapsible otherwise) -->
+                    <div class="mb-3" id="notesFieldWrapper">
+                        <label class="form-label small fw-semibold mb-1">
+                            Paste Notes <span class="text-muted fw-normal">(Optional)</span>
+                        </label>
+                        <textarea name="notes_text" class="form-control" rows="3"
+                                  placeholder="Paste lecture notes or syllabus points for tailored help..."></textarea>
+                    </div>
+
+                    <button type="submit" id="aiSubmitBtn" class="btn btn-primary rounded-pill w-100 py-2 fw-semibold">
+                        <i class="bi bi-stars me-1"></i> Generate with AI
+                    </button>
+                </form>
             </div>
         </div>
-        {% endif %}
 
-        <!-- Generated AI Response -->
-        <div class="card p-4 mb-4">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h6 class="fw-bold m-0">Generated Recommendation</h6>
-                {% if ai_response %}
-                    <span class="badge bg-info-subtle text-info border">{{ ai_response.source }}</span>
+        <!-- RIGHT: AI Output & Interactive Quiz Area -->
+        <div class="col-lg-7">
+            <div class="card p-4 h-100 d-flex flex-column justify-content-between">
+
+                {% if interactive_quiz_json or ai_response %}
+                    <div>
+                        <!-- Header + Quick Actions -->
+                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 pb-3 mb-3 border-bottom border-secondary border-opacity-25">
+                            <h5 class="fw-bold mb-0">
+                                <i class="bi bi-robot text-primary me-2"></i>
+                                {% if interactive_quiz_json %}Interactive Quiz{% else %}AI Study Guide{% endif %}
+                                {% if tested_topic_title %}<span class="text-muted fw-normal small">· {{ tested_topic_title }}</span>{% endif %}
+                            </h5>
+
+                            {% if ai_response %}
+                                <div class="d-flex align-items-center gap-2">
+                                    <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-3" onclick="copyAiOutput()">
+                                        <i class="bi bi-clipboard me-1"></i> Copy
+                                    </button>
+
+                                    <form method="post" action="{% url 'convert_ai_to_tasks' %}" class="m-0">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="subject_name" id="convertSubjectName" value="">
+                                        <input type="hidden" name="ai_content" value="{{ ai_response }}">
+                                        <button type="submit" class="btn btn-sm btn-outline-success rounded-pill px-3">
+                                            <i class="bi bi-check2-square me-1"></i> Save as Tasks
+                                        </button>
+                                    </form>
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Interactive Quiz Widget (if Quiz mode) -->
+                        {% if interactive_quiz_json %}
+                            <div id="interactiveQuizContainer" class="mb-4"></div>
+
+                            <form method="post" action="{% url 'log_quiz_attempt' %}" id="logQuizForm" class="d-none mt-3 p-3 rounded-3"
+                                  style="background: var(--subtle-surface);">
+                                {% csrf_token %}
+                                <input type="hidden" name="subject" value="{{ selected_subject_pk|default:'' }}">
+                                <input type="hidden" name="topic_title" value="{{ tested_topic_title }}">
+                                <input type="hidden" name="score" id="quizScoreInput" value="0">
+                                <input type="hidden" name="total_questions" id="quizTotalInput" value="3">
+
+                                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                                    <div>
+                                        <div class="fw-bold" id="quizResultBanner">Score: 0 / 0</div>
+                                        <div class="small text-muted">Save this attempt to track your progress.</div>
+                                    </div>
+                                    {% if selected_subject_pk %}
+                                        <button type="submit" class="btn btn-success btn-sm rounded-pill px-4">
+                                            <i class="bi bi-save me-1"></i> Save Score
+                                        </button>
+                                    {% endif %}
+                                </div>
+                            </form>
+                        {% endif %}
+
+                        <!-- Text Response Output -->
+                        {% if ai_response %}
+                            <div id="aiResponseText" class="ai-output-box">{{ ai_response }}</div>
+                        {% endif %}
+                    </div>
+                {% else %}
+                    <!-- Clean Empty State -->
+                    <div class="text-center my-auto py-5 text-muted">
+                        <i class="bi bi-stars fs-1 d-block mb-3 text-primary opacity-50"></i>
+                        <h5 class="fw-bold mb-2">Ready to study smarter?</h5>
+                        <p class="small mb-0 mx-auto" style="max-width: 380px;">
+                            Pick a subject and topic on the left to generate a step-by-step study plan, summarize notes, or test yourself with an interactive quiz.
+                        </p>
+                    </div>
+                {% endif %}
+
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Centered Pop-Up Modal: Recent Quiz History -->
+<div class="modal fade" id="quizHistoryModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content glass-panel p-3 border-0 shadow-lg">
+            <div class="modal-header border-0 pb-2">
+                <h5 class="modal-title fw-bold"><i class="bi bi-trophy-fill text-warning me-2"></i>Recent Quiz Scores</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                {% if quiz_attempts %}
+                    <div class="list-group list-group-flush">
+                        {% for q in quiz_attempts %}
+                            <div class="list-group-item d-flex justify-content-between align-items-center gap-3 py-3 px-1">
+                                <div class="overflow-hidden">
+                                    <div class="fw-semibold text-truncate">{{ q.topic_title }}</div>
+                                    <div class="small text-muted">{{ q.subject.name }}</div>
+                                </div>
+                                <span class="badge rounded-pill bg-primary bg-opacity-10 text-primary px-3 py-2 flex-shrink-0">
+                                    {{ q.score }} / {{ q.total_questions }}
+                                </span>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center py-4 text-muted">
+                        <p class="small mb-0">No quiz attempts recorded yet. Try generating an Interactive Quiz!</p>
+                    </div>
                 {% endif %}
             </div>
-
-            {% if ai_response %}
-                <div class="d-flex flex-wrap justify-content-end gap-2 mb-2">
-                    <form method="post" action="{% url 'convert_ai_to_tasks' %}" class="m-0">
-                        {% csrf_token %}
-                        <input type="hidden" name="subject_name" value="{{ request.POST.subject_name }}">
-                        <textarea name="ai_content" class="d-none">{{ ai_response.content }}</textarea>
-                        <button type="submit" class="btn btn-sm btn-success rounded-pill px-3">
-                            <i class="bi bi-plus-circle me-1"></i> Save Bullet Points as Study Tasks
-                        </button>
-                    </form>
-                    <button type="button" class="btn btn-sm btn-outline-info rounded-pill px-3" onclick="copyAiText()">
-                        <i class="bi bi-clipboard me-1"></i> Copy Response
-                    </button>
-                    <button type="button" class="btn btn-sm btn-outline-light rounded-pill px-3" onclick="window.print()">
-                        <i class="bi bi-file-earmark-pdf me-1"></i> Save Notes as PDF
-                    </button>
-                </div>
-                <div id="aiRawContent" class="d-none">{{ ai_response.content }}</div>
-                <div id="aiFormattedOutput" class="p-4 rounded-4 mb-3"
-                     style="background: rgba(3, 7, 18, 0.65); border: 1px solid rgba(255,255,255,0.12); line-height: 1.7; font-size: 0.96rem;">
-                </div>
-                <div class="alert alert-warning small mb-0 py-2 border-0" style="background: rgba(245, 158, 11, 0.15); color: #fde68a;">
-                    <i class="bi bi-exclamation-triangle me-1"></i>
-                    <strong>Note:</strong> Always verify AI-generated definitions and quiz answers against your official course syllabus.
-                </div>
-            {% else %}
-                <div class="text-center py-5 text-muted">
-                    <i class="bi bi-robot fs-1 d-block mb-2 text-info"></i>
-                    <p class="small mb-0">Select an AI mode on the left to generate a revision strategy, concept explanation, note summary, or interactive quiz.</p>
-                </div>
-            {% endif %}
-        </div>
-
-        <!-- Recent Quiz Attempts History -->
-        <div class="card p-4">
-            <h6 class="fw-bold mb-3">Recent Quiz Performance</h6>
-            {% if quiz_attempts %}
-                <div class="list-group list-group-flush small">
-                    {% for q in quiz_attempts %}
-                        <div class="list-group-item px-0 py-2 d-flex justify-content-between align-items-center">
-                            <div>
-                                <strong>{{ q.topic_title }}</strong> ({{ q.subject.name }})
-                                <span class="text-muted ms-2">• {{ q.attempted_at|date:"d M Y" }}</span>
-                            </div>
-                            <span class="badge rounded-pill px-3 py-2 {% if q.percentage >= 70 %}bg-success{% elif q.percentage >= 40 %}bg-warning text-dark{% else %}bg-danger{% endif %}">
-                                {{ q.score }}/{{ q.total_questions }} ({{ q.percentage }}%)
-                            </span>
-                        </div>
-                    {% endfor %}
-                </div>
-            {% else %}
-                <p class="text-muted small mb-0">No quiz attempts recorded yet. Generate a quiz above and log your score!</p>
-            {% endif %}
+            <div class="modal-footer border-0 pt-2">
+                <button type="button" class="btn btn-outline-secondary rounded-pill px-4" data-bs-dismiss="modal">Close</button>
+            </div>
         </div>
     </div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
-<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script>
-    const rawEl = document.getElementById('aiRawContent');
-    const outEl = document.getElementById('aiFormattedOutput');
-    if (rawEl && outEl && window.marked) {
-        outEl.innerHTML = marked.parse(rawEl.textContent);
-    } else if (rawEl && outEl) {
-        outEl.textContent = rawEl.textContent;
+// Map subjects to their topics for instant autocomplete suggestions
+const subjectTopicsMap = {
+    {% for subj in subjects %}
+        "{{ subj.name|escapejs }}": [{% for t in subj.topics.all %}"{{ t.title|escapejs }}"{% if not forloop.last %}, {% endif %}{% endfor %}]{% if not forloop.last %},{% endif %}
+    {% endfor %}
+};
+
+document.addEventListener('DOMContentLoaded', () => {
+    const modal = document.getElementById('quizHistoryModal');
+    if (modal) document.body.appendChild(modal);
+
+    updateTopicSuggestions();
+    syncConvertSubject();
+    renderInteractiveQuiz();
+});
+
+function syncConvertSubject() {
+    const subjSelect = document.getElementById('aiSubjectSelect');
+    const hiddenSubj = document.getElementById('convertSubjectName');
+    if (subjSelect && hiddenSubj) hiddenSubj.value = subjSelect.value;
+}
+
+function updateTopicSuggestions() {
+    const subjSelect = document.getElementById('aiSubjectSelect');
+    const datalist = document.getElementById('topicSuggestions');
+    if (!subjSelect || !datalist) return;
+
+    syncConvertSubject();
+    const topics = subjectTopicsMap[subjSelect.value] || [];
+    datalist.innerHTML = topics.map(t => `<option value="${t}">`).join('');
+}
+
+function showAiLoading() {
+    const btn = document.getElementById('aiSubmitBtn');
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Thinking...';
     }
+}
 
-    function copyAiText() {
-        if (!rawEl) return;
-        navigator.clipboard.writeText(rawEl.textContent);
-        alert("AI Study Guidance copied to clipboard!");
-    }
+function copyAiOutput() {
+    const text = document.getElementById('aiResponseText')?.innerText || '';
+    if (!text) return;
+    navigator.clipboard.writeText(text).then(() => alert('Copied AI guide to clipboard!'));
+}
 
-    // Interactive Quiz Renderer & Auto-Grader
-    {% if interactive_quiz_json %}
-    const quizData = {{ interactive_quiz_json|safe }};
-    const quizContainer = document.getElementById('interactiveQuizContainer');
+// Render Interactive Quiz if quiz JSON was returned
+function renderInteractiveQuiz() {
+    const container = document.getElementById('interactiveQuizContainer');
+    if (!container) return;
 
-    if (quizContainer && Array.isArray(quizData)) {
-        quizData.forEach((q, qIndex) => {
-            const block = document.createElement('div');
-            block.className = 'p-3 rounded-4';
-            block.style.background = 'rgba(255,255,255,0.04)';
-            block.style.border = '1px solid rgba(255,255,255,0.1)';
+    const quizData = {{ interactive_quiz_json|default:"null"|safe }};
+    if (!Array.isArray(quizData) || quizData.length === 0) return;
 
-            let optionsHtml = '';
-            (q.options || []).forEach((opt, optIndex) => {
-                optionsHtml += `
-                    <div class="form-check mb-2">
-                        <input class="form-check-input" type="radio" name="q_${qIndex}" id="q_${qIndex}_${optIndex}" value="${optIndex}">
-                        <label class="form-check-label small" for="q_${qIndex}_${optIndex}" id="label_${qIndex}_${optIndex}">
+    let html = '';
+    quizData.forEach((q, qIdx) => {
+        const options = q.options || [];
+        html += `
+            <div class="p-3 mb-3 rounded-3 border border-secondary border-opacity-25 quiz-question-block" data-qidx="${qIdx}">
+                <div class="fw-semibold mb-2">${qIdx + 1}. ${q.question}</div>
+                <div class="d-grid gap-2">
+                    ${options.map((opt, oIdx) => `
+                        <button type="button" class="btn btn-sm btn-outline-secondary rounded-3 quiz-option-btn"
+                                onclick="selectQuizOption(${qIdx}, ${oIdx}, this)">
                             ${opt}
-                        </label>
-                    </div>
-                `;
-            });
-
-            block.innerHTML = `
-                <div class="fw-bold small mb-2">Q${qIndex + 1}. ${q.question}</div>
-                ${optionsHtml}
-                <div id="exp_${qIndex}" class="small mt-2 p-2 rounded-3 d-none" style="background: rgba(6, 182, 212, 0.15); color: #67e8f9;">
-                    <strong>Explanation:</strong> ${q.explanation || ''}
+                        </button>
+                    `).join('')}
                 </div>
-            `;
-            quizContainer.appendChild(block);
-        });
-    }
+                <div class="small mt-2 d-none quiz-feedback"></div>
+            </div>
+        `;
+    });
 
-    function gradeInteractiveQuiz() {
-        let correctCount = 0;
-        quizData.forEach((q, qIndex) => {
-            const selected = document.querySelector(`input[name="q_${qIndex}"]:checked`);
-            const expEl = document.getElementById(`exp_${qIndex}`);
-            if (expEl) expEl.classList.remove('d-none');
+    html += `
+        <button type="button" id="checkQuizBtn" class="btn btn-primary btn-sm rounded-pill px-4" onclick="gradeQuiz()">
+            <i class="bi bi-check2-all me-1"></i> Check Answers
+        </button>
+    `;
 
-            (q.options || []).forEach((_, optIndex) => {
-                const lbl = document.getElementById(`label_${qIndex}_${optIndex}`);
-                if (!lbl) return;
-                lbl.style.fontWeight = 'normal';
-                lbl.style.color = '#f8fafc';
-                if (optIndex === q.correct_index) {
-                    lbl.style.color = '#34d399';
-                    lbl.style.fontWeight = '700';
-                }
-            });
+    container.innerHTML = html;
+    window._quizData = quizData;
+    window._userAnswers = {};
+}
 
-            if (selected && parseInt(selected.value) === q.correct_index) {
-                correctCount++;
-            } else if (selected) {
-                const wrongLbl = document.getElementById(`label_${qIndex}_${selected.value}`);
-                if (wrongLbl) wrongLbl.style.color = '#f87171';
-            }
-        });
+function selectQuizOption(qIdx, oIdx, btn) {
+    window._userAnswers[qIdx] = oIdx;
+    const block = btn.closest('.quiz-question-block');
+    block.querySelectorAll('.quiz-option-btn').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+}
 
-        const badge = document.getElementById('liveQuizScoreBadge');
-        if (badge) {
-            badge.textContent = `Scored: ${correctCount} / ${quizData.length}`;
-            badge.className = 'badge rounded-pill bg-success px-3 py-2';
+function gradeQuiz() {
+    const quizData = window._quizData || [];
+    let score = 0;
+
+    quizData.forEach((q, qIdx) => {
+        const block = document.querySelector(`.quiz-question-block[data-qidx="${qIdx}"]`);
+        const feedback = block.querySelector('.quiz-feedback');
+        const chosenIdx = window._userAnswers[qIdx];
+        const options = q.options || [];
+
+        let correctIdx = typeof q.correct_index === 'number'
+            ? q.correct_index
+            : options.findIndex(o => o === q.answer || o.startsWith(q.answer));
+
+        if (chosenIdx === correctIdx && correctIdx !== -1) {
+            score++;
+            feedback.className = 'small mt-2 text-success fw-semibold';
+            feedback.textContent = '✓ Correct!' + (q.explanation ? ` ${q.explanation}` : '');
+        } else {
+            feedback.className = 'small mt-2 text-danger';
+            const correctText = options[correctIdx] || q.answer || '';
+            feedback.textContent = `✗ Correct answer: ${correctText}` + (q.explanation ? ` — ${q.explanation}` : '');
         }
-        const scoreInput = document.getElementById('quizScoreInput');
-        const totalInput = document.getElementById('quizTotalInput');
-        if (scoreInput) scoreInput.value = correctCount;
-        if (totalInput) totalInput.value = quizData.length;
-    }
-    {% endif %}
+    });
+
+    document.getElementById('quizScoreInput').value = score;
+    document.getElementById('quizTotalInput').value = quizData.length;
+    document.getElementById('quizResultBanner').textContent = `Score: ${score} / ${quizData.length}`;
+    document.getElementById('logQuizForm').classList.remove('d-none');
+}
 </script>
 {% endblock %}

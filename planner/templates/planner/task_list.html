@@ -1,67 +1,234 @@
 {% extends 'base.html' %}
-{% block title %}Study Tasks | AI Study Planner{% endblock %}
+{% block title %}Study Tasks | StudyOS{% endblock %}
 {% block page_title %}Study Tasks{% endblock %}
 
 {% block content %}
-<div class="row g-4">
-    <div class="col-lg-4">
-        <div class="card p-4">
-            <h6 class="fw-bold mb-3">Create Study Task</h6>
-            <form method="post">
+<style>
+    body {
+        perspective: none !important;
+    }
+    .modal-backdrop {
+        backdrop-filter: blur(6px);
+    }
+    .task-toggle-btn {
+        background: none;
+        border: none;
+        padding: 0;
+        line-height: 1;
+        transition: transform 0.15s ease;
+    }
+    .task-toggle-btn:hover {
+        transform: scale(1.2);
+    }
+</style>
+
+<div class="container-fluid px-0" style="max-width: 1020px;">
+
+    <!-- Clean Top Action Bar -->
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+        <!-- Status Filter Pills -->
+        <div class="d-flex align-items-center gap-2">
+            <button type="button" class="btn btn-sm btn-primary rounded-pill px-3 filter-btn active" onclick="filterTasks('all', this)">All</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-3 filter-btn" onclick="filterTasks('pending', this)">Pending</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-3 filter-btn" onclick="filterTasks('completed', this)">Completed</button>
+        </div>
+
+        <!-- Search + Rollover + New Task -->
+        <div class="d-flex flex-wrap align-items-center gap-2 flex-grow-1 flex-md-grow-0">
+            <input type="text" id="taskSearch" class="form-control form-control-sm"
+                   placeholder="Search tasks or subjects..." onkeyup="applyTaskFilters()" style="min-width: 190px; max-width: 240px;">
+
+            <form method="post" action="{% url 'rollover_tasks' %}" class="m-0"
+                  onsubmit="return confirm('Move all overdue pending tasks to today?');">
                 {% csrf_token %}
-                {% for field in form %}
-                    <div class="mb-3">
-                        <label class="form-label small fw-semibold">{{ field.label }}</label>
-                        {{ field }}
-                        {% for error in field.errors %}
-                            <div class="text-danger small">{{ error }}</div>
-                        {% endfor %}
-                    </div>
-                {% endfor %}
-                <button type="submit" class="btn btn-primary w-100">Add Task</button>
+                <button type="submit" class="btn btn-outline-warning btn-sm rounded-pill px-3 text-nowrap" title="Move overdue tasks to today">
+                    <i class="bi bi-arrow-clockwise me-1"></i> Rollover
+                </button>
             </form>
+
+            <button type="button" class="btn btn-primary btn-sm rounded-pill px-3 text-nowrap"
+                    data-bs-toggle="modal" data-bs-target="#addTaskModal">
+                <i class="bi bi-plus-lg me-1"></i> New Task
+            </button>
         </div>
     </div>
 
-    <div class="col-lg-8">
-        <div class="card p-4">
-            <h6 class="fw-bold mb-3">All Study Tasks ({{ tasks.count }})</h6>
-            {% if tasks %}
-                <div class="list-group list-group-flush">
-                    {% for task in tasks %}
-                        <div class="list-group-item px-0 d-flex justify-content-between align-items-center">
-                            <div class="d-flex align-items-center gap-3">
-                                <form method="post" action="{% url 'task_toggle' task.pk %}" class="m-0">
-                                    {% csrf_token %}
-                                    <button type="submit" class="btn btn-sm {% if task.status == 'completed' %}btn-success{% else %}btn-outline-secondary{% endif %}">
-                                        <i class="bi {% if task.status == 'completed' %}bi-check-lg{% else %}bi-circle{% endif %}"></i>
-                                    </button>
-                                </form>
-                                <div>
-                                    <div class="fw-semibold {% if task.status == 'completed' %}text-decoration-line-through text-muted{% endif %}">
-                                        {{ task.title }}
-                                    </div>
-                                    <small class="text-muted">
-                                        {{ task.subject.name }}
-                                        {% if task.topic %} ({{ task.topic.title }}){% endif %}
-                                        • {{ task.planned_minutes }} mins • Due {{ task.due_date }}
-                                    </small>
+    <!-- Clean Task List -->
+    <div class="card p-2 p-md-3">
+        {% if tasks %}
+            <div class="list-group list-group-flush" id="taskList">
+                {% for task in tasks %}
+                    {% with st=task.status|lower pr=task.priority|lower %}
+                    <div class="list-group-item d-flex flex-wrap flex-sm-nowrap align-items-center justify-content-between gap-3 py-3 px-2 px-md-3 task-row"
+                         data-status="{% if st == 'completed' or st == 'done' %}completed{% else %}pending{% endif %}"
+                         data-search="{{ task.title|lower }} {{ task.subject.name|default:''|lower }} {{ task.topic.title|default:''|lower }}">
+
+                        <!-- Left: One-Click Complete Toggle + Task Details -->
+                        <div class="d-flex align-items-start align-items-sm-center gap-3 overflow-hidden">
+                            <form method="post" action="{% url 'task_toggle' task.id %}" class="m-0 flex-shrink-0">
+                                {% csrf_token %}
+                                <button type="submit" class="task-toggle-btn fs-5 {% if st == 'completed' or st == 'done' %}text-success{% else %}text-muted{% endif %}"
+                                        title="{% if st == 'completed' or st == 'done' %}Mark as Pending{% else %}Mark as Completed{% endif %}">
+                                    {% if st == 'completed' or st == 'done' %}
+                                        <i class="bi bi-check-circle-fill"></i>
+                                    {% else %}
+                                        <i class="bi bi-circle"></i>
+                                    {% endif %}
+                                </button>
+                            </form>
+
+                            <div class="overflow-hidden">
+                                <div class="fw-semibold text-truncate {% if st == 'completed' or st == 'done' %}text-decoration-line-through text-muted{% endif %}">
+                                    {{ task.title }}
+                                </div>
+                                <div class="d-flex flex-wrap align-items-center gap-2 small text-muted mt-1">
+                                    {% if task.subject %}
+                                        <span class="badge rounded-pill fw-normal"
+                                              style="background: {{ task.subject.color|default:'#6366f1' }}22; color: {{ task.subject.color|default:'#6366f1' }};">
+                                            {{ task.subject.name }}
+                                        </span>
+                                    {% endif %}
+                                    {% if task.topic %}
+                                        <span class="text-truncate" style="max-width: 180px;">
+                                            <i class="bi bi-tag me-1"></i>{{ task.topic.title }}
+                                        </span>
+                                    {% endif %}
+                                    {% if task.planned_minutes %}
+                                        <span><i class="bi bi-clock me-1"></i>{{ task.planned_minutes }}m</span>
+                                    {% endif %}
+                                    {% if task.due_date %}
+                                        <span><i class="bi bi-calendar-event me-1"></i>{{ task.due_date|date:"M d" }}</span>
+                                    {% endif %}
                                 </div>
                             </div>
-                            <div class="d-flex align-items-center gap-2">
-                                <span class="badge bg-primary-subtle text-primary text-uppercase">{{ task.priority }}</span>
-                                <a href="{% url 'task_edit' task.pk %}" class="btn btn-sm btn-outline-secondary">Edit</a>
-                                <a href="{% url 'task_delete' task.pk %}" class="btn btn-sm btn-outline-danger">Delete</a>
+                        </div>
+
+                        <!-- Right: Priority Pill + Study / Edit / Delete -->
+                        <div class="d-flex align-items-center gap-2 flex-shrink-0 ms-auto">
+                            {% if task.priority %}
+                                <span class="badge rounded-pill text-capitalize
+                                    {% if pr == 'high' or pr == 'urgent' %}bg-danger bg-opacity-25 text-danger
+                                    {% elif pr == 'medium' %}bg-warning bg-opacity-25 text-warning
+                                    {% else %}bg-info bg-opacity-25 text-info{% endif %}">
+                                    {{ task.priority }}
+                                </span>
+                            {% endif %}
+
+                            <a href="{% url 'study_plan' %}" class="btn btn-sm btn-outline-primary rounded-pill px-2" title="Focus in Study Plan">
+                                <i class="bi bi-play-fill"></i>
+                            </a>
+
+                            <a href="{% url 'task_edit' task.id %}" class="btn btn-sm btn-link text-muted p-1" title="Edit Task">
+                                <i class="bi bi-pencil-square"></i>
+                            </a>
+
+                            <form method="post" action="{% url 'task_delete' task.id %}" class="m-0"
+                                  onsubmit="return confirm('Delete task "{{ task.title|escapejs }}"?');">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-sm btn-link text-danger p-1" title="Delete Task">
+                                    <i class="bi bi-trash3"></i>
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                    {% endwith %}
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="text-center py-5 text-muted">
+                <i class="bi bi-check2-circle fs-1 d-block mb-2 opacity-50"></i>
+                <p class="mb-3">No study tasks yet.</p>
+                <button type="button" class="btn btn-primary btn-sm rounded-pill px-4"
+                        data-bs-toggle="modal" data-bs-target="#addTaskModal">
+                    Create your first task
+                </button>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Centered Pop-Up Modal: New Study Task -->
+<div class="modal fade" id="addTaskModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content glass-panel p-3 border-0 shadow-lg">
+            <div class="modal-header border-0 pb-2">
+                <h5 class="modal-title fw-bold">
+                    <i class="bi bi-plus-circle text-primary me-2"></i>New Study Task
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post">
+                {% csrf_token %}
+                <div class="modal-body">
+                    {% if form %}
+                        <div class="row g-3">
+                            {% for field in form %}
+                                <div class="{% if field.name == 'title' or field.name == 'description' %}col-12{% else %}col-md-6{% endif %}">
+                                    <label class="form-label small fw-semibold mb-1" for="{{ field.id_for_label }}">
+                                        {{ field.label }}
+                                    </label>
+                                    {{ field }}
+                                    {% if field.errors %}
+                                        <div class="text-danger small mt-1">{{ field.errors|striptags }}</div>
+                                    {% endif %}
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="row g-3">
+                            <div class="col-12">
+                                <label class="form-label small fw-semibold mb-1">Task Title</label>
+                                <input type="text" name="title" class="form-control" placeholder="e.g., Revise Binary Trees" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-semibold mb-1">Planned Minutes</label>
+                                <input type="number" name="planned_minutes" class="form-control" value="45" min="5" max="300">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-semibold mb-1">Due Date</label>
+                                <input type="date" name="due_date" class="form-control">
                             </div>
                         </div>
-                    {% endfor %}
+                    {% endif %}
                 </div>
-            {% else %}
-                <div class="text-center py-4 text-muted">
-                    No tasks created yet. First add a Subject, then create study tasks here!
+                <div class="modal-footer border-0 pt-2">
+                    <button type="button" class="btn btn-outline-secondary rounded-pill px-3" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary rounded-pill px-4">Add Task</button>
                 </div>
-            {% endif %}
+            </form>
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const topicsBySubject = {{ topics_by_subject_json|default:"{}"|safe }};
+    const subjectSelect = document.getElementById('id_subject');
+    const topicSelect = document.getElementById('id_topic');
+
+    if (subjectSelect && topicSelect) {
+        function updateTopics() {
+            const subjectId = subjectSelect.value;
+            const currentTopicId = topicSelect.value;
+            const topics = topicsBySubject[subjectId] || [];
+
+            topicSelect.innerHTML = '<option value="">---------</option>';
+            topics.forEach(t => {
+                const opt = document.createElement('option');
+                opt.value = t.id;
+                opt.textContent = t.title;
+                if (String(t.id) === String(currentTopicId)) {
+                    opt.selected = true;
+                }
+                topicSelect.appendChild(opt);
+            });
+        }
+
+        subjectSelect.addEventListener('change', updateTopics);
+        updateTopics(); // Initial filter on page load
+    }
+});
+</script>
 {% endblock %}

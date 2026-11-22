@@ -1,38 +1,60 @@
+import csv
 import json
-from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth import login
-from django.contrib.auth.decorators import login_required
+import re
+
 from django.contrib import messages
-from django.utils import timezone
-from django.db.models import Sum
+from django.contrib.auth import login, update_session_auth_hash
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth.forms import PasswordChangeForm
 from django.contrib.auth.models import User
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
-from .forms import (
-    StudentRegistrationForm, StudentProfileForm,
-    SubjectForm, TopicForm, ExamForm, StudyTaskForm
-)
-
-import csv
+from django.db.models import Sum
 from django.http import HttpResponse
+from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
+
+from .forms import (
+    ExamForm,
+    StudentProfileForm,
+    StudentRegistrationForm,
+    StudyTaskForm,
+    SubjectForm,
+    TopicForm,
+)
 from .models import (
-    StudentProfile, Subject, Topic, Exam,
-    StudyTask, StudySession, StudyPlanBlock, QuizAttempt, Flashcard
+    Exam,
+    Flashcard,
+    QuizAttempt,
+    StudentProfile,
+    StudyPlanBlock,
+    StudySession,
+    StudyTask,
+    Subject,
+    Topic,
 )
 from .services import (
-    generate_study_plan_for_user,
-    generate_ai_study_assistance,
     calculate_study_streak,
-    generate_interactive_quiz_json,
     generate_ai_flashcards_data,
+    generate_ai_study_assistance,
+    generate_interactive_quiz_json,
+    generate_study_plan_for_user,
     get_adaptive_time_recommendations,
 )
 
-import re
 
-from django.contrib.auth import update_session_auth_hash
-from django.contrib.auth.forms import PasswordChangeForm
+# ==================== HELPER UTILITIES ====================
 
+def _get_topics_by_subject_json(user):
+    """Returns a JSON string mapping subject IDs to their topics for dependent dropdowns."""
+    topics_map = {}
+    for t in Topic.objects.filter(subject__user=user).values('id', 'title', 'subject_id'):
+        sid = str(t['subject_id'])
+        topics_map.setdefault(sid, []).append({'id': t['id'], 'title': t['title']})
+    return json.dumps(topics_map)
+
+
+# ==================== PUBLIC & AUTHENTICATION ====================
 
 def landing_view(request):
     if request.user.is_authenticated:
@@ -61,6 +83,40 @@ def register_view(request):
     return render(request, 'registration/register.html', {'form': form})
 
 
+def forgot_password_view(request):
+    if request.user.is_authenticated:
+        return redirect('dashboard')
+
+    if request.method == 'POST':
+        username = request.POST.get('username', '').strip()
+        email = request.POST.get('email', '').strip()
+        new_password1 = request.POST.get('new_password1', '')
+        new_password2 = request.POST.get('new_password2', '')
+
+        if not username or not email or not new_password1 or not new_password2:
+            messages.error(request, 'Please fill in all fields.')
+        elif new_password1 != new_password2:
+            messages.error(request, 'New passwords do not match.')
+        else:
+            user = User.objects.filter(username__iexact=username, email__iexact=email).first()
+            if not user:
+                messages.error(request, 'No student account found matching that Username and Email.')
+            else:
+                try:
+                    validate_password(new_password1, user=user)
+                    user.set_password(new_password1)
+                    user.save()
+                    messages.success(request, 'Password reset successful! You can now sign in with your new password.')
+                    return redirect('login')
+                except ValidationError as e:
+                    for err in e.messages:
+                        messages.error(request, err)
+
+    return render(request, 'registration/forgot_password.html')
+
+
+# ==================== DASHBOARD, PROFILE & SETTINGS ====================
+
 @login_required
 def dashboard_view(request):
     profile, _ = StudentProfile.objects.get_or_create(user=request.user)
@@ -87,15 +143,14 @@ def dashboard_view(request):
         subject__user=request.user
     ).count()
 
-    # 2. Upcoming Exams
+    # 2. Upcoming Exams & Subjects
     upcoming_exams = Exam.objects.filter(
         user=request.user, exam_date__gte=today
     ).select_related('subject').order_by('exam_date')[:4]
 
-    # 3. Subjects with Topic Progress
     subjects = Subject.objects.filter(user=request.user).prefetch_related('topics')
 
-    # 4. Last 7 Days Chart Data (Actual Study Minutes vs Daily Goal)
+    # 3. Last 7 Days Chart Data (Actual Study Minutes vs Daily Goal)
     chart_labels = []
     chart_actual_minutes = []
     chart_goal_minutes = []
@@ -111,6 +166,14 @@ def dashboard_view(request):
         chart_actual_minutes.append(day_total)
         chart_goal_minutes.append(profile.daily_goal_minutes)
 
+    # 4. Streak & 48-Hour Deadline Reminders
+    streak_days = calculate_study_streak(request.user)
+    two_days_later = today + timezone.timedelta(days=2)
+    urgent_exams = Exam.objects.filter(user=request.user, exam_date__range=[today, two_days_later])
+    urgent_tasks = StudyTask.objects.filter(
+        user=request.user, due_date__range=[today, two_days_later]
+    ).exclude(status='completed')
+
     context = {
         'profile': profile,
         'tasks_due_today': tasks_due_today,
@@ -121,19 +184,46 @@ def dashboard_view(request):
         'total_topics_count': total_topics_count,
         'upcoming_exams': upcoming_exams,
         'subjects': subjects,
+        'streak_days': streak_days,
+        'urgent_exams': urgent_exams,
+        'urgent_tasks': urgent_tasks,
         'chart_labels_json': json.dumps(chart_labels),
         'chart_actual_json': json.dumps(chart_actual_minutes),
         'chart_goal_json': json.dumps(chart_goal_minutes),
     }
-    # 5. Streak & 48-Hour Deadline Reminders
-    streak_days = calculate_study_streak(request.user)
-    two_days_later = today + timezone.timedelta(days=2)
-    urgent_exams = Exam.objects.filter(user=request.user, exam_date__range=[today, two_days_later])
-    urgent_tasks = StudyTask.objects.filter(
-        user=request.user, due_date__range=[today, two_days_later]
-    ).exclude(status='completed')
-
     return render(request, 'planner/dashboard.html', context)
+
+
+@login_required
+def profile_view(request):
+    profile, _ = StudentProfile.objects.get_or_create(user=request.user)
+
+    if request.method == 'POST':
+        request.user.first_name = request.POST.get('first_name', '').strip()
+        request.user.last_name = request.POST.get('last_name', '').strip()
+        request.user.email = request.POST.get('email', '').strip()
+        request.user.save()
+
+        try:
+            goal = int(request.POST.get('daily_goal_minutes', 120))
+            profile.daily_goal_minutes = max(15, min(720, goal))
+        except ValueError:
+            profile.daily_goal_minutes = 120
+        profile.save()
+
+        messages.success(request, 'Profile updated successfully!')
+        return redirect('profile')
+
+    context = {
+        'profile': profile,
+        'subjects_count': Subject.objects.filter(user=request.user).count(),
+        'completed_tasks_count': StudyTask.objects.filter(
+            user=request.user,
+            status__in=['completed', 'done', 'COMPLETED', 'DONE']
+        ).count(),
+    }
+    return render(request, 'planner/profile.html', context)
+
 
 @login_required
 def settings_view(request):
@@ -156,7 +246,7 @@ def settings_view(request):
                 task.due_date or '',
             ])
         return response
-    
+
     profile, _ = StudentProfile.objects.get_or_create(user=request.user)
     password_form = PasswordChangeForm(request.user)
 
@@ -188,7 +278,7 @@ def settings_view(request):
             password_form = PasswordChangeForm(request.user, request.POST)
             if password_form.is_valid():
                 user = password_form.save()
-                update_session_auth_hash(request, user)  # Keep user logged in
+                update_session_auth_hash(request, user)
                 messages.success(request, 'Your password was updated successfully!')
                 return redirect('settings')
             else:
@@ -259,46 +349,38 @@ def subject_detail_view(request, pk):
 
 
 @login_required
-def subject_edit_view(request, pk):
+def edit_subject_view(request, pk):
+    """Handles inline modal edits for a Subject."""
     subject = get_object_or_404(Subject, pk=pk, user=request.user)
     if request.method == 'POST':
-        form = SubjectForm(request.POST, instance=subject)
-        if form.is_valid():
-            form.save()
-            messages.success(request, "Subject updated successfully.")
-            return redirect('subject_detail', pk=subject.pk)
-    else:
-        form = SubjectForm(instance=subject)
-
-    return render(request, 'planner/form_page.html', {
-        'title': f'Edit Subject: {subject.name}',
-        'form': form,
-        'cancel_url': 'subject_list',
-    })
+        subject.name = request.POST.get('name', subject.name).strip()
+        subject.description = request.POST.get('description', '').strip()
+        subject.color = request.POST.get('color', subject.color) or '#6366f1'
+        subject.save()
+        messages.success(request, f'Subject "{subject.name}" updated!')
+    return redirect(request.POST.get('next', 'subject_list'))
 
 
 @login_required
-def subject_delete_view(request, pk):
+def delete_subject_view(request, pk):
+    """Deletes a Subject and its associated topics."""
     subject = get_object_or_404(Subject, pk=pk, user=request.user)
     if request.method == 'POST':
+        name = subject.name
         subject.delete()
-        messages.info(request, "Subject deleted.")
-        return redirect('subject_list')
-    return render(request, 'planner/confirm_delete.html', {
-        'object_name': subject.name,
-        'cancel_url': 'subject_list',
-    })
+        messages.success(request, f'Subject "{name}" deleted.')
+    return redirect('subject_list')
 
 
 @login_required
 def topic_toggle_view(request, pk):
+    """Toggles Topic completion and auto-schedules Spaced Repetition review tasks."""
     topic = get_object_or_404(Topic, pk=pk, subject__user=request.user)
     if request.method == 'POST':
         topic.is_completed = not topic.is_completed
         topic.save()
 
         if topic.is_completed:
-            # Auto-schedule Spaced Repetition revision tasks (+1d, +3d, +7d, +14d)
             today = timezone.localdate()
             intervals = [1, 3, 7, 14] if topic.difficulty == 'hard' else [3, 7]
             created_sr = 0
@@ -326,36 +408,28 @@ def topic_toggle_view(request, pk):
 
 
 @login_required
-def topic_edit_view(request, pk):
+def edit_topic_view(request, pk):
+    """Handles inline modal edits for a Topic."""
     topic = get_object_or_404(Topic, pk=pk, subject__user=request.user)
     if request.method == 'POST':
-        form = TopicForm(request.POST, instance=topic)
-        if form.is_valid():
-            form.save()
-            messages.success(request, "Topic updated.")
-            return redirect('subject_detail', pk=topic.subject.pk)
-    else:
-        form = TopicForm(instance=topic)
-
-    return render(request, 'planner/form_page.html', {
-        'title': f'Edit Topic: {topic.title}',
-        'form': form,
-        'cancel_url': 'subject_list',
-    })
+        topic.title = request.POST.get('title', topic.title).strip()
+        if hasattr(topic, 'difficulty') and request.POST.get('difficulty'):
+            topic.difficulty = request.POST.get('difficulty')
+        topic.save()
+        messages.success(request, f'Topic "{topic.title}" updated!')
+    return redirect('subject_detail', pk=topic.subject.id)
 
 
 @login_required
-def topic_delete_view(request, pk):
+def delete_topic_view(request, pk):
+    """Deletes a Topic from its parent Subject."""
     topic = get_object_or_404(Topic, pk=pk, subject__user=request.user)
-    subject_pk = topic.subject.pk
+    subject_id = topic.subject.id
     if request.method == 'POST':
+        title = topic.title
         topic.delete()
-        messages.info(request, "Topic deleted.")
-        return redirect('subject_detail', pk=subject_pk)
-    return render(request, 'planner/confirm_delete.html', {
-        'object_name': topic.title,
-        'cancel_url': 'subject_list',
-    })
+        messages.success(request, f'Topic "{title}" deleted.')
+    return redirect('subject_detail', pk=subject_id)
 
 
 # ==================== EXAMS CRUD ====================
@@ -433,7 +507,11 @@ def task_list_view(request):
     else:
         form = StudyTaskForm(user=request.user, initial={'due_date': timezone.localdate()})
 
-    return render(request, 'planner/task_list.html', {'tasks': tasks, 'form': form})
+    return render(request, 'planner/task_list.html', {
+        'tasks': tasks,
+        'form': form,
+        'topics_by_subject_json': _get_topics_by_subject_json(request.user),
+    })
 
 
 @login_required
@@ -456,15 +534,15 @@ def task_edit_view(request, pk):
         form = StudyTaskForm(request.POST, instance=task, user=request.user)
         if form.is_valid():
             form.save()
-            messages.success(request, "Task updated.")
+            messages.success(request, f'Task "{task.title}" updated!')
             return redirect('task_list')
     else:
         form = StudyTaskForm(instance=task, user=request.user)
 
-    return render(request, 'planner/form_page.html', {
-        'title': f'Edit Task: {task.title}',
+    return render(request, 'planner/task_edit.html', {
         'form': form,
-        'cancel_url': 'task_list',
+        'task': task,
+        'topics_by_subject_json': _get_topics_by_subject_json(request.user),
     })
 
 
@@ -480,14 +558,14 @@ def task_delete_view(request, pk):
         'cancel_url': 'task_list',
     })
 
+
 # ==================== STUDY PLANNER & SESSIONS ====================
 
 @login_required
 def study_plan_view(request):
     today = timezone.localdate()
     profile, _ = StudentProfile.objects.get_or_create(user=request.user)
-    
-    # Get user's generated plan blocks for today
+
     plan_blocks = StudyPlanBlock.objects.filter(
         user=request.user, plan_date=today
     ).select_related('task', 'task__subject', 'task__topic')
@@ -504,7 +582,6 @@ def study_plan_view(request):
             messages.info(request, "Today's study plan has been cleared.")
             return redirect('study_plan')
 
-    # Also grab past sessions for logging reference
     sessions = StudySession.objects.filter(user=request.user)[:10]
 
     context = {
@@ -512,6 +589,7 @@ def study_plan_view(request):
         'profile': profile,
         'today': today,
         'sessions': sessions,
+        'subjects': Subject.objects.filter(user=request.user),
     }
     return render(request, 'planner/study_plan.html', context)
 
@@ -543,7 +621,8 @@ def log_session_view(request):
 
     return redirect('study_plan')
 
-# ==================== PROGRESS & ANALYTICS (PHASE 7) ====================
+
+# ==================== PROGRESS & ANALYTICS ====================
 
 @login_required
 def progress_view(request):
@@ -565,14 +644,14 @@ def progress_view(request):
     total_tasks_count = StudyTask.objects.filter(user=request.user).count()
 
     # Subject-wise study minutes breakdown for Doughnut chart
-    subject_Usage = (
+    subject_usage = (
         sessions.values('subject__name', 'subject__color')
         .annotate(minutes=Sum('duration_minutes'))
         .order_by('-minutes')
     )
-    subj_labels = [item['subject__name'] for item in subject_Usage]
-    subj_minutes = [item['minutes'] for item in subject_Usage]
-    subj_colors = [item['subject__color'] for item in subject_Usage]
+    subj_labels = [item['subject__name'] for item in subject_usage]
+    subj_minutes = [item['minutes'] for item in subject_usage]
+    subj_colors = [item['subject__color'] for item in subject_usage]
 
     # Daily trend data over selected range
     trend_labels = []
@@ -600,7 +679,30 @@ def progress_view(request):
     return render(request, 'planner/progress.html', context)
 
 
-# ==================== OPTIONAL AI ASSISTANT (PHASE 8) ====================
+@login_required
+def export_progress_csv_view(request):
+    """Exports the logged-in student's study sessions to a downloadable CSV report."""
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = 'attachment; filename="study_progress_report.csv"'
+
+    writer = csv.writer(response)
+    writer.writerow(['Date', 'Subject', 'Topic', 'Task', 'Duration (Minutes)', 'Notes'])
+
+    sessions = StudySession.objects.filter(user=request.user).select_related('subject', 'topic', 'task')
+    for s in sessions:
+        writer.writerow([
+            s.started_at,
+            s.subject.name,
+            s.topic.title if s.topic else '',
+            s.task.title if s.task else '',
+            s.duration_minutes,
+            s.notes,
+        ])
+
+    return response
+
+
+# ==================== AI ASSISTANT & QUIZZES ====================
 
 @login_required
 def ai_assistant_view(request):
@@ -668,30 +770,7 @@ def log_quiz_attempt_view(request):
     return redirect('ai_assistant')
 
 
-@login_required
-def export_progress_csv_view(request):
-    """Exports the logged-in student's study sessions to a downloadable CSV report."""
-    response = HttpResponse(content_type='text/csv')
-    response['Content-Disposition'] = 'attachment; filename="study_progress_report.csv"'
-
-    writer = csv.writer(response)
-    writer.writerow(['Date', 'Subject', 'Topic', 'Task', 'Duration (Minutes)', 'Notes'])
-
-    sessions = StudySession.objects.filter(user=request.user).select_related('subject', 'topic', 'task')
-    for s in sessions:
-        writer.writerow([
-            s.started_at,
-            s.subject.name,
-            s.topic.title if s.topic else '',
-            s.task.title if s.task else '',
-            s.duration_minutes,
-            s.notes
-        ])
-
-    return response
-
-
-# ==================== STAGE 1: FRICTION REDUCERS ====================
+# ==================== FRICTION REDUCERS ====================
 
 @login_required
 def rollover_overdue_tasks_view(request):
@@ -708,7 +787,7 @@ def rollover_overdue_tasks_view(request):
             messages.success(request, f"Rolled over {count} overdue task(s) to today ({today})!")
         else:
             messages.info(request, "No overdue tasks found — you are right on schedule!")
-    return redirect('dashboard')
+    return redirect(request.META.get('HTTP_REFERER', 'dashboard'))
 
 
 @login_required
@@ -723,7 +802,6 @@ def bulk_import_topics_view(request, pk):
         lines = [line.strip() for line in raw_syllabus.splitlines() if line.strip()]
         created_count = 0
         for line in lines:
-            # Clean leading bullet characters or numbers like "1. ", "- ", "• "
             clean_title = re.sub(r'^[\d\.\-\*\•\s]+', '', line).strip()
             if clean_title:
                 Topic.objects.create(
@@ -758,7 +836,6 @@ def convert_ai_to_tasks_view(request):
             messages.error(request, "Please create at least one Subject first before saving AI tasks.")
             return redirect('subject_list')
 
-        # Match numbered items or bullet points from the AI response
         lines = [line.strip() for line in ai_content.splitlines() if line.strip()]
         task_lines = [
             re.sub(r'^[\d\.\-\*\•\#\s]+', '', line).strip()
@@ -766,7 +843,6 @@ def convert_ai_to_tasks_view(request):
             if re.match(r'^(\d+[\.\)]|\-|\*|\•)\s+', line)
         ]
 
-        # Fallback if AI didn't use standard bullets
         if not task_lines:
             task_lines = [line[:180] for line in lines if len(line) > 15][:4]
 
@@ -790,7 +866,8 @@ def convert_ai_to_tasks_view(request):
 
     return redirect('ai_assistant')
 
-# ==================== STAGE 2: 3D FLASHCARD STUDIO ====================
+
+# ==================== 3D FLASHCARD STUDIO ====================
 
 @login_required
 def flashcard_list_view(request):
@@ -852,7 +929,8 @@ def flashcard_delete_view(request, pk):
         messages.info(request, "Flashcard removed.")
     return redirect('flashcard_list')
 
-# ==================== STAGE 3: INTERACTIVE CALENDAR & ADAPTIVE AI ====================
+
+# ==================== INTERACTIVE CALENDAR & ADAPTIVE AI ====================
 
 @login_required
 def calendar_view(request):
@@ -911,62 +989,3 @@ def apply_adaptive_estimate_view(request, subject_pk):
             f"Calibrated pending tasks & topics in {subject.name} to {new_minutes} mins based on your study history!"
         )
     return redirect('calendar_view')
-
-def forgot_password_view(request):
-    if request.user.is_authenticated:
-        return redirect('dashboard')
-
-    if request.method == 'POST':
-        username = request.POST.get('username', '').strip()
-        email = request.POST.get('email', '').strip()
-        new_password1 = request.POST.get('new_password1', '')
-        new_password2 = request.POST.get('new_password2', '')
-
-        if not username or not email or not new_password1 or not new_password2:
-            messages.error(request, 'Please fill in all fields.')
-        elif new_password1 != new_password2:
-            messages.error(request, 'New passwords do not match.')
-        else:
-            user = User.objects.filter(username__iexact=username, email__iexact=email).first()
-            if not user:
-                messages.error(request, 'No student account found matching that Username and Email.')
-            else:
-                try:
-                    validate_password(new_password1, user=user)
-                    user.set_password(new_password1)
-                    user.save()
-                    messages.success(request, 'Password reset successful! You can now sign in with your new password.')
-                    return redirect('login')
-                except ValidationError as e:
-                    for err in e.messages:
-                        messages.error(request, err)
-
-    return render(request, 'registration/forgot_password.html')
-
-@login_required
-def profile_view(request):
-    profile, _ = StudentProfile.objects.get_or_create(user=request.user)
-
-    if request.method == 'POST':
-        request.user.first_name = request.POST.get('first_name', '').strip()
-        request.user.last_name = request.POST.get('last_name', '').strip()
-        request.user.email = request.POST.get('email', '').strip()
-        request.user.save()
-
-        try:
-            goal = int(request.POST.get('daily_goal_minutes', 120))
-            profile.daily_goal_minutes = max(15, min(720, goal))
-        except ValueError:
-            profile.daily_goal_minutes = 120
-        profile.save()
-
-        messages.success(request, 'Profile updated successfully!')
-        return redirect('profile')
-
-    context = {
-        'profile': profile,
-        'subjects_count': Subject.objects.filter(user=request.user).count(),
-        'completed_tasks_count': StudyTask.objects.filter(user=request.user, status__in=['completed', 'done', 'COMPLETED', 'DONE']).count(),
-    }
-    return render(request, 'planner/profile.html', context)
-

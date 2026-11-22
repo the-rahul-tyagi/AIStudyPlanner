@@ -90,7 +90,6 @@
             color: var(--text-main);
             min-height: 100vh;
             overflow-x: hidden;
-            perspective: 1400px;
             transition: background-color 0.3s ease, color 0.3s ease;
         }
 
@@ -161,7 +160,7 @@
             box-shadow: var(--card-hover-shadow) !important;
         }
 
-        /* ==================== FLOATING SPATIAL SIDEBAR DOCK ==================== */
+        /* ==================== FLOATING SCROLLABLE SPATIAL SIDEBAR DOCK ==================== */
         .spatial-sidebar {
             position: sticky;
             top: 1.25rem;
@@ -175,9 +174,57 @@
             box-shadow: var(--card-shadow);
             display: flex;
             flex-direction: column;
-            justify-content: space-between;
-            padding: 1.35rem 1rem;
+            padding: 1.25rem 0.9rem;
+            overflow: hidden;
             transition: background 0.3s ease, border-color 0.3s ease;
+        }
+
+        .sidebar-header {
+            flex-shrink: 0;
+            padding-bottom: 1rem;
+            margin-bottom: 0.5rem;
+            border-bottom: 1px solid var(--glass-border);
+        }
+
+        .sidebar-scroll {
+            flex: 1 1 auto;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding-right: 4px;
+            margin-right: -4px;
+            scrollbar-width: thin;
+            scrollbar-color: color-mix(in srgb, var(--accent-2) 45%, transparent) transparent;
+        }
+
+        .sidebar-scroll::-webkit-scrollbar {
+            width: 5px;
+        }
+        .sidebar-scroll::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .sidebar-scroll::-webkit-scrollbar-thumb {
+            background: color-mix(in srgb, var(--accent-2) 35%, transparent);
+            border-radius: 999px;
+        }
+        .sidebar-scroll::-webkit-scrollbar-thumb:hover {
+            background: color-mix(in srgb, var(--accent-2) 75%, transparent);
+        }
+
+        .sidebar-section-label {
+            font-size: 0.68rem;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--text-muted-custom);
+            opacity: 0.7;
+            padding: 0.75rem 0.85rem 0.3rem;
+        }
+
+        .sidebar-footer {
+            flex-shrink: 0;
+            margin-top: 0.75rem;
+            padding-top: 0.75rem;
+            border-top: 1px solid var(--glass-border);
         }
 
         .brand-logo {
@@ -197,35 +244,38 @@
 
         .spatial-sidebar .nav-link {
             color: var(--nav-link-color);
-            border-radius: 1rem;
-            margin-bottom: 0.35rem;
-            padding: 0.7rem 1rem;
+            border-radius: 0.95rem;
+            margin-bottom: 0.25rem;
+            padding: 0.65rem 0.9rem;
             font-weight: 600;
-            font-size: 0.92rem;
+            font-size: 0.9rem;
             display: flex;
             align-items: center;
             gap: 0.75rem;
-            transition: all 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+            transition: all 0.22s cubic-bezier(0.22, 1, 0.36, 1);
             border: 1px solid transparent;
         }
         .spatial-sidebar .nav-link i {
-            font-size: 1.15rem;
+            font-size: 1.1rem;
             transition: transform 0.25s ease;
         }
         .spatial-sidebar .nav-link:hover {
             color: var(--text-main);
             background: var(--nav-link-hover-bg);
             border-color: var(--glass-border);
-            transform: translateX(6px) translateZ(10px);
+            transform: translateX(5px);
         }
         .spatial-sidebar .nav-link:hover i {
-            transform: scale(1.2) rotate(-5deg);
+            transform: scale(1.18) rotate(-5deg);
         }
         .spatial-sidebar .nav-link.active {
             background: var(--primary-grad);
             color: #ffffff !important;
-            box-shadow: 0 12px 28px -6px color-mix(in srgb, var(--accent-2) 65%, transparent);
+            box-shadow: 0 10px 24px -6px color-mix(in srgb, var(--accent-2) 65%, transparent);
             border-top: 1px solid rgba(255, 255, 255, 0.45);
+        }
+        .spatial-sidebar .nav-link.active i {
+            color: #ffffff !important;
         }
 
         /* ==================== FLOATING HUD TOPBAR ==================== */
@@ -385,11 +435,12 @@
     {% if user.is_authenticated %}
     <div class="container-fluid px-lg-4">
         <div class="row g-4">
-            <!-- Left Floating 3D Spatial Dock -->
+            <!-- Left Floating Scrollable 3D Spatial Dock -->
             <div class="col-md-3 col-lg-2 d-none d-md-block">
                 <nav class="spatial-sidebar">
-                    <div>
-                        <a href="{% url 'dashboard' %}" class="d-flex align-items-center mb-4 text-decoration-none gap-2 px-2">
+                    <!-- Pinned Brand Header -->
+                    <div class="sidebar-header">
+                        <a href="{% url 'dashboard' %}" class="d-flex align-items-center text-decoration-none gap-2 px-1">
                             <div class="brand-orb text-white">
                                 <i class="bi bi-boxes fs-5"></i>
                             </div>
@@ -398,7 +449,11 @@
                                 <small class="text-muted" style="font-size: 0.68rem;">3D AI PLANNER</small>
                             </div>
                         </a>
+                    </div>
 
+                    <!-- Independently Scrollable Nav Section -->
+                    <div class="sidebar-scroll">
+                        <div class="sidebar-section-label">Core</div>
                         <ul class="nav flex-column" id="sidebarNav">
                             <li class="nav-item">
                                 <a class="nav-link" href="{% url 'dashboard' %}">
@@ -420,6 +475,8 @@
                                     <i class="bi bi-cpu-fill text-warning"></i> Study Plan
                                 </a>
                             </li>
+
+                            <div class="sidebar-section-label">Study Tools</div>
                             <li class="nav-item">
                                 <a class="nav-link" href="{% url 'calendar_view' %}">
                                     <i class="bi bi-calendar3-week-fill text-info"></i> Calendar
@@ -436,13 +493,15 @@
                                 </a>
                             </li>
                             <li class="nav-item">
-                                <a class="nav-link" href="{% url 'progress' %}">
-                                    <i class="bi bi-activity text-info"></i> Analytics
-                                </a>
-                            </li>
-                            <li class="nav-item">
                                 <a class="nav-link" href="{% url 'ai_assistant' %}">
                                     <i class="bi bi-stars text-warning"></i> AI Coach
+                                </a>
+                            </li>
+
+                            <div class="sidebar-section-label">Insights & System</div>
+                            <li class="nav-item">
+                                <a class="nav-link" href="{% url 'progress' %}">
+                                    <i class="bi bi-activity text-info"></i> Analytics
                                 </a>
                             </li>
                             <li class="nav-item">
@@ -453,18 +512,20 @@
                         </ul>
                     </div>
 
-                    <!-- Aura Color & Theme Switcher in Sidebar Footer -->
-                    <div class="p-3 rounded-4" style="background: var(--subtle-surface); border: 1px solid var(--glass-border);">
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <span class="small text-muted fw-semibold"><i class="bi bi-palette2 me-1"></i>3D Aura</span>
-                            <button type="button" onclick="toggleSiteTheme()" class="btn btn-sm p-0 border-0 text-muted" title="Switch Light/Dark Mode">
-                                <i class="bi bi-sun-fill theme-toggle-icon"></i>
-                            </button>
-                        </div>
-                        <div class="d-flex gap-2">
-                            <button onclick="setAura('cyber')" class="btn btn-sm w-100 rounded-pill" style="background: linear-gradient(135deg,#6366f1,#ec4899); height: 24px;" title="Cyberpunk"></button>
-                            <button onclick="setAura('aurora')" class="btn btn-sm w-100 rounded-pill" style="background: linear-gradient(135deg,#10b981,#3b82f6); height: 24px;" title="Aurora"></button>
-                            <button onclick="setAura('sunset')" class="btn btn-sm w-100 rounded-pill" style="background: linear-gradient(135deg,#f97316,#8b5cf6); height: 24px;" title="Sunset"></button>
+                    <!-- Pinned Aura Color & Theme Switcher Footer -->
+                    <div class="sidebar-footer">
+                        <div class="p-3 rounded-4" style="background: var(--subtle-surface); border: 1px solid var(--glass-border);">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="small text-muted fw-semibold"><i class="bi bi-palette2 me-1"></i>3D Aura</span>
+                                <button type="button" onclick="toggleSiteTheme()" class="btn btn-sm p-0 border-0 text-muted" title="Switch Light/Dark Mode">
+                                    <i class="bi bi-sun-fill theme-toggle-icon"></i>
+                                </button>
+                            </div>
+                            <div class="d-flex gap-2">
+                                <button onclick="setAura('cyber')" class="btn btn-sm w-100 rounded-pill" style="background: linear-gradient(135deg,#6366f1,#ec4899); height: 24px;" title="Cyberpunk"></button>
+                                <button onclick="setAura('aurora')" class="btn btn-sm w-100 rounded-pill" style="background: linear-gradient(135deg,#10b981,#3b82f6); height: 24px;" title="Aurora"></button>
+                                <button onclick="setAura('sunset')" class="btn btn-sm w-100 rounded-pill" style="background: linear-gradient(135deg,#f97316,#8b5cf6); height: 24px;" title="Sunset"></button>
+                            </div>
                         </div>
                     </div>
                 </nav>
@@ -490,7 +551,7 @@
                             <i class="bi bi-sun-fill text-warning theme-toggle-icon"></i>
                             <span class="d-none d-md-inline theme-toggle-label">Light</span>
                         </button>
-                        
+
                         <!-- Clickable Profile Logo -->
                         <a href="{% url 'profile' %}" class="d-inline-flex align-items-center gap-2 text-decoration-none" title="View / Edit Profile">
                             <div class="d-flex align-items-center justify-content-center rounded-circle text-white fw-bold shadow-sm"
@@ -541,6 +602,8 @@
                         <a href="{% url 'task_list' %}" class="list-group-item list-group-item-action rounded-3 mb-1"><i class="bi bi-check2-all text-success me-2"></i>Create or Complete Study Tasks</a>
                         <a href="{% url 'exam_list' %}" class="list-group-item list-group-item-action rounded-3 mb-1"><i class="bi bi-calendar2-heart-fill text-danger me-2"></i>View Exam Countdown</a>
                         <a href="{% url 'progress' %}" class="list-group-item list-group-item-action rounded-3 mb-1"><i class="bi bi-activity text-info me-2"></i>View Analytics & Export CSV</a>
+                        <a href="{% url 'profile' %}" class="list-group-item list-group-item-action rounded-3 mb-1"><i class="bi bi-person-circle text-primary me-2"></i>View / Edit Profile</a>
+                        <a href="{% url 'settings' %}" class="list-group-item list-group-item-action rounded-3 mb-1"><i class="bi bi-sliders2-vertical text-secondary me-2"></i>Open Settings</a>
                     </div>
                 </div>
             </div>
