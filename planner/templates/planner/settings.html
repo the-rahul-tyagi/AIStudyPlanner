@@ -1,25 +1,281 @@
 {% extends 'base.html' %}
 {% block title %}Settings | AI Study Planner{% endblock %}
-{% block page_title %}Study Preferences & Settings{% endblock %}
 
 {% block content %}
-<div class="card p-4" style="max-width: 550px;">
-    <h6 class="fw-bold mb-3">Update Your Daily Study Target</h6>
-    <form method="post">
-        {% csrf_token %}
-        {% for field in form %}
-            <div class="mb-3">
-                <label class="form-label fw-semibold small">{{ field.label }}</label>
-                {{ field }}
-                {% if field.help_text %}
-                    <div class="form-text small">{{ field.help_text }}</div>
-                {% endif %}
-                {% for error in field.errors %}
-                    <div class="text-danger small">{{ error }}</div>
-                {% endfor %}
+<div class="container py-4" style="max-width: 1080px;">
+    <div class="d-flex align-items-center justify-content-between mb-4">
+        <div>
+            <h2 class="fw-bold mb-1"><i class="bi bi-sliders text-primary me-2"></i>Settings</h2>
+            <p class="text-muted mb-0">Manage your profile, 3D Aura appearance, study engine, and security.</p>
+        </div>
+        <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary rounded-pill px-4">
+            <i class="bi bi-arrow-left me-1"></i> Dashboard
+        </a>
+    </div>
+
+    <div class="row g-4">
+        <!-- Left Sidebar Tabs -->
+        <div class="col-lg-3">
+            <div class="card p-3" style="border-radius: 20px;">
+                <div class="nav flex-column nav-pills gap-2" id="settings-tabs" role="tablist">
+                    <button class="nav-link active text-start rounded-3 py-2 px-3 fw-semibold" data-bs-toggle="pill" data-bs-target="#tab-profile" type="button">
+                        <i class="bi bi-person-circle me-2"></i> Profile
+                    </button>
+                    <button class="nav-link text-start rounded-3 py-2 px-3 fw-semibold" data-bs-toggle="pill" data-bs-target="#tab-appearance" type="button">
+                        <i class="bi bi-palette2 me-2"></i> Appearance & Aura
+                    </button>
+                    <button class="nav-link text-start rounded-3 py-2 px-3 fw-semibold" data-bs-toggle="pill" data-bs-target="#tab-study" type="button">
+                        <i class="bi bi-clock-history me-2"></i> Study & Timer
+                    </button>
+                    <button class="nav-link text-start rounded-3 py-2 px-3 fw-semibold" data-bs-toggle="pill" data-bs-target="#tab-security" type="button">
+                        <i class="bi bi-shield-lock me-2"></i> Password & Security
+                    </button>
+                    <button class="nav-link text-start rounded-3 py-2 px-3 fw-semibold text-danger" data-bs-toggle="pill" data-bs-target="#tab-data" type="button">
+                        <i class="bi bi-database-gear me-2"></i> Data & Reset
+                    </button>
+                </div>
             </div>
-        {% endfor %}
-        <button type="submit" class="btn btn-primary">Save Preferences</button>
-    </form>
+        </div>
+
+        <!-- Right Content Panels -->
+        <div class="col-lg-9">
+            <div class="tab-content">
+
+                <!-- TAB 1: PROFILE -->
+                <div class="tab-pane fade show active" id="tab-profile">
+                    <div class="card p-4 p-md-5" style="border-radius: 22px;">
+                        <div class="d-flex flex-column flex-sm-row align-items-center gap-4 pb-4 mb-4 border-bottom">
+                            <div class="d-flex align-items-center justify-content-center rounded-circle text-white fw-bold shadow"
+                                 style="width: 78px; height: 78px; font-size: 1.9rem; background: linear-gradient(135deg, #6366f1, #06b6d4);">
+                                {{ request.user.username|slice:":1"|upper }}
+                            </div>
+                            <div class="text-center text-sm-start">
+                                <h4 class="fw-bold mb-1">
+                                    {% if request.user.first_name or request.user.last_name %}
+                                        {{ request.user.first_name }} {{ request.user.last_name }}
+                                    {% else %}
+                                        {{ request.user.username }}
+                                    {% endif %}
+                                </h4>
+                                <p class="text-muted small mb-2">@{{ request.user.username }} • Joined {{ request.user.date_joined|date:"M Y" }}</p>
+                                <div class="d-flex flex-wrap gap-2 justify-content-center justify-content-sm-start">
+                                    <span class="badge bg-primary bg-opacity-10 text-primary px-3 py-2 rounded-pill">{{ subjects_count }} Subjects</span>
+                                    <span class="badge bg-success bg-opacity-10 text-success px-3 py-2 rounded-pill">{{ completed_tasks_count }} Completed</span>
+                                    <span class="badge bg-info bg-opacity-10 text-info px-3 py-2 rounded-pill">{{ total_tasks_count }} Total Tasks</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <form method="post">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="update_profile">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label small fw-semibold">First Name</label>
+                                    <input type="text" name="first_name" class="form-control" value="{{ request.user.first_name }}" placeholder="First name">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label small fw-semibold">Last Name</label>
+                                    <input type="text" name="last_name" class="form-control" value="{{ request.user.last_name }}" placeholder="Last name">
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label small fw-semibold">Email Address</label>
+                                    <input type="email" name="email" class="form-control" value="{{ request.user.email }}" placeholder="you@example.com">
+                                </div>
+                            </div>
+                            <div class="mt-4 text-end">
+                                <button type="submit" class="btn btn-primary px-4 rounded-pill">
+                                    <i class="bi bi-check-lg me-1"></i> Save Profile
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- TAB 2: APPEARANCE & 3D AURA -->
+                <div class="tab-pane fade" id="tab-appearance">
+                    <div class="card p-4 p-md-5" style="border-radius: 22px;">
+                        <h5 class="fw-bold mb-1">Theme Mode</h5>
+                        <p class="text-muted small mb-3">Switch between Light and Dark glassmorphism interfaces.</p>
+                        <div class="d-flex gap-3 mb-4 pb-4 border-bottom">
+                            <button type="button" class="btn btn-outline-primary rounded-pill px-4" onclick="setThemeMode('light')">
+                                <i class="bi bi-sun-fill me-2"></i> Light Mode
+                            </button>
+                            <button type="button" class="btn btn-outline-primary rounded-pill px-4" onclick="setThemeMode('dark')">
+                                <i class="bi bi-moon-stars-fill me-2"></i> Dark Mode
+                            </button>
+                        </div>
+
+                        <h5 class="fw-bold mb-1">3D Ambient Aura</h5>
+                        <p class="text-muted small mb-3">Choose the glowing background gradient for your workspace.</p>
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <div class="p-3 rounded-4 border text-center aura-option" role="button" onclick="setAuraTheme('cyberpunk')"
+                                     style="background: linear-gradient(135deg, rgba(99,102,241,0.25), rgba(6,182,212,0.25));">
+                                    <div class="rounded-circle mx-auto mb-2 shadow" style="width:42px;height:42px;background:linear-gradient(135deg,#6366f1,#06b6d4);"></div>
+                                    <div class="fw-bold">Cyberpunk</div>
+                                    <small class="text-muted">Indigo & Cyan</small>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="p-3 rounded-4 border text-center aura-option" role="button" onclick="setAuraTheme('aurora')"
+                                     style="background: linear-gradient(135deg, rgba(16,185,129,0.25), rgba(168,85,247,0.25));">
+                                    <div class="rounded-circle mx-auto mb-2 shadow" style="width:42px;height:42px;background:linear-gradient(135deg,#10b981,#a855f7);"></div>
+                                    <div class="fw-bold">Aurora</div>
+                                    <small class="text-muted">Emerald & Violet</small>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="p-3 rounded-4 border text-center aura-option" role="button" onclick="setAuraTheme('sunset')"
+                                     style="background: linear-gradient(135deg, rgba(245,158,11,0.25), rgba(236,72,153,0.25));">
+                                    <div class="rounded-circle mx-auto mb-2 shadow" style="width:42px;height:42px;background:linear-gradient(135deg,#f59e0b,#ec4899);"></div>
+                                    <div class="fw-bold">Sunset</div>
+                                    <small class="text-muted">Amber & Rose</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="appearance-status" class="small text-success fw-semibold mt-3"></div>
+                    </div>
+                </div>
+
+                <!-- TAB 3: STUDY & TIMER PREFERENCES -->
+                <div class="tab-pane fade" id="tab-study">
+                    <div class="card p-4 p-md-5" style="border-radius: 22px;">
+                        <h5 class="fw-bold mb-3">Adaptive Study Engine</h5>
+                        <form method="post" class="pb-4 mb-4 border-bottom">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="update_study_prefs">
+                            <div class="row g-3 align-items-end">
+                                <div class="col-md-8">
+                                    <label class="form-label small fw-semibold">Daily Study Goal (Minutes)</label>
+                                    <input type="number" name="daily_goal_minutes" class="form-control" min="15" max="720" value="{{ profile.daily_goal_minutes }}" required>
+                                    <div class="form-text">Used by the Smart Study Plan generator to cap your daily workload.</div>
+                                </div>
+                                <div class="col-md-4">
+                                    <button type="submit" class="btn btn-primary w-100 rounded-pill">Save Goal</button>
+                                </div>
+                            </div>
+                        </form>
+
+                        <h5 class="fw-bold mb-3">Focus Stopwatch & Notifications</h5>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label small fw-semibold">Default Focus Session (Minutes)</label>
+                                <input type="number" id="pref-focus-mins" class="form-control" value="25" min="5" max="120">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-semibold">Short Break Duration (Minutes)</label>
+                                <input type="number" id="pref-break-mins" class="form-control" value="5" min="1" max="30">
+                            </div>
+                            <div class="col-12">
+                                <div class="form-check form-switch mt-2">
+                                    <input class="form-check-input" type="checkbox" id="pref-sound" checked>
+                                    <label class="form-check-label" for="pref-sound">Play chime sound when focus timer finishes</label>
+                                </div>
+                                <div class="form-check form-switch mt-2">
+                                    <input class="form-check-input" type="checkbox" id="pref-spaced-rep" checked>
+                                    <label class="form-check-label" for="pref-spaced-rep">Auto-schedule Spaced Repetition (+1d, +3d, +7d, +14d)</label>
+                                </div>
+                            </div>
+                            <div class="col-12 text-end">
+                                <button type="button" class="btn btn-outline-primary rounded-pill px-4" onclick="saveLocalStudyPrefs()">
+                                    Save Timer Preferences
+                                </button>
+                            </div>
+                        </div>
+                        <div id="timer-pref-status" class="small text-success fw-semibold mt-2"></div>
+                    </div>
+                </div>
+
+                <!-- TAB 4: PASSWORD & SECURITY -->
+                <div class="tab-pane fade" id="tab-security">
+                    <div class="card p-4 p-md-5" style="border-radius: 22px;">
+                        <h5 class="fw-bold mb-1">Change Password</h5>
+                        <p class="text-muted small mb-4">Use a strong password to keep your study account secure.</p>
+
+                        <form method="post">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="change_password">
+                            {% for field in password_form %}
+                                <div class="mb-3">
+                                    <label class="form-label small fw-semibold">{{ field.label }}</label>
+                                    <input type="password" name="{{ field.name }}" class="form-control" required>
+                                    {% if field.errors %}
+                                        <div class="text-danger small mt-1">{{ field.errors|striptags }}</div>
+                                    {% endif %}
+                                </div>
+                            {% endfor %}
+                            <div class="mt-4 text-end">
+                                <button type="submit" class="btn btn-primary px-4 rounded-pill">
+                                    <i class="bi bi-key me-1"></i> Update Password
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- TAB 5: DATA & DANGER ZONE -->
+                <div class="tab-pane fade" id="tab-data">
+                    <div class="card p-4 p-md-5" style="border-radius: 22px;">
+                        <h5 class="fw-bold mb-3">Export & Backup</h5>
+                        <div class="d-flex align-items-center justify-content-between p-3 rounded-4 border mb-4">
+                            <div>
+                                <div class="fw-semibold">Export Study History (CSV)</div>
+                                <small class="text-muted">Download all your study tasks and progress for Excel or Google Sheets.</small>
+                            </div>
+                            <a href="?export=csv" class="btn btn-outline-primary rounded-pill px-4">
+                                <i class="bi bi-download me-1"></i> Export
+                            </a>
+                        </div>
+
+                        <h5 class="fw-bold text-danger mb-3">Danger Zone</h5>
+                        <div class="d-flex align-items-center justify-content-between p-3 rounded-4 border border-danger border-opacity-50">
+                            <div>
+                                <div class="fw-semibold text-danger">Clear Completed Tasks</div>
+                                <small class="text-muted">Permanently remove all completed tasks from your history.</small>
+                            </div>
+                            <form method="post" onsubmit="return confirm('Are you sure you want to delete all completed tasks?');">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="clear_completed">
+                                <button type="submit" class="btn btn-outline-danger rounded-pill px-4">Clear Tasks</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
 </div>
+
+<script>
+function setThemeMode(mode) {
+    document.documentElement.setAttribute('data-bs-theme', mode);
+    document.documentElement.setAttribute('data-theme', mode);
+    localStorage.setItem('theme', mode);
+    document.getElementById('appearance-status').textContent = `Switched to ${mode} mode.`;
+}
+
+function setAuraTheme(aura) {
+    document.documentElement.setAttribute('data-aura', aura);
+    localStorage.setItem('aura', aura);
+    document.getElementById('appearance-status').textContent = `Applied ${aura} 3D Aura theme!`;
+}
+
+function saveLocalStudyPrefs() {
+    localStorage.setItem('focus_mins', document.getElementById('pref-focus-mins').value);
+    localStorage.setItem('break_mins', document.getElementById('pref-break-mins').value);
+    localStorage.setItem('timer_sound', document.getElementById('pref-sound').checked);
+    localStorage.setItem('spaced_rep', document.getElementById('pref-spaced-rep').checked);
+    document.getElementById('timer-pref-status').textContent = 'Timer & notification preferences saved!';
+}
+
+// Load saved local preferences on page load
+document.addEventListener('DOMContentLoaded', () => {
+    if (localStorage.getItem('focus_mins')) document.getElementById('pref-focus-mins').value = localStorage.getItem('focus_mins');
+    if (localStorage.getItem('break_mins')) document.getElementById('pref-break-mins').value = localStorage.getItem('break_mins');
+    if (localStorage.getItem('timer_sound') !== null) document.getElementById('pref-sound').checked = localStorage.getItem('timer_sound') === 'true';
+    if (localStorage.getItem('spaced_rep') !== null) document.getElementById('pref-spaced-rep').checked = localStorage.getItem('spaced_rep') === 'true';
+});
+</script>
 {% endblock %}

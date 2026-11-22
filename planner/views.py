@@ -8,9 +8,6 @@ from django.db.models import Sum
 from django.contrib.auth.models import User
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
-
-
-
 from .forms import (
     StudentRegistrationForm, StudentProfileForm,
     SubjectForm, TopicForm, ExamForm, StudyTaskForm
@@ -33,6 +30,8 @@ from .services import (
 
 import re
 
+from django.contrib.auth import update_session_auth_hash
+from django.contrib.auth.forms import PasswordChangeForm
 
 
 def landing_view(request):
@@ -136,20 +135,85 @@ def dashboard_view(request):
 
     return render(request, 'planner/dashboard.html', context)
 
-
 @login_required
 def settings_view(request):
-    profile, _ = StudentProfile.objects.get_or_create(user=request.user)
-    if request.method == 'POST':
-        form = StudentProfileForm(request.POST, instance=profile)
-        if form.is_valid():
-            form.save()
-            messages.success(request, "Your study preferences have been updated.")
-            return redirect('settings')
-    else:
-        form = StudentProfileForm(instance=profile)
+    # Handle CSV export directly via ?export=csv
+    if request.GET.get('export') == 'csv':
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = 'attachment; filename="study_history.csv"'
+        writer = csv.writer(response)
+        writer.writerow(['Title', 'Subject', 'Topic', 'Priority', 'Status', 'Planned Minutes', 'Due Date'])
 
-    return render(request, 'planner/settings.html', {'form': form})
+        tasks = StudyTask.objects.filter(user=request.user).select_related('subject', 'topic')
+        for task in tasks:
+            writer.writerow([
+                task.title,
+                task.subject.name if task.subject else '',
+                task.topic.title if task.topic else '',
+                task.priority,
+                task.status,
+                task.planned_minutes,
+                task.due_date or '',
+            ])
+        return response
+    
+    profile, _ = StudentProfile.objects.get_or_create(user=request.user)
+    password_form = PasswordChangeForm(request.user)
+
+    if request.method == 'POST':
+        action = request.POST.get('action')
+
+        # 1. Update Profile Details
+        if action == 'update_profile':
+            request.user.first_name = request.POST.get('first_name', '').strip()
+            request.user.last_name = request.POST.get('last_name', '').strip()
+            request.user.email = request.POST.get('email', '').strip()
+            request.user.save()
+            messages.success(request, 'Profile details updated successfully!')
+            return redirect('settings')
+
+        # 2. Update Study Preferences
+        elif action == 'update_study_prefs':
+            try:
+                goal = int(request.POST.get('daily_goal_minutes', 120))
+                profile.daily_goal_minutes = max(15, min(720, goal))
+                profile.save()
+                messages.success(request, f'Daily study goal updated to {profile.daily_goal_minutes} minutes!')
+            except ValueError:
+                messages.error(request, 'Please enter a valid number for daily goal minutes.')
+            return redirect('settings')
+
+        # 3. Change Password
+        elif action == 'change_password':
+            password_form = PasswordChangeForm(request.user, request.POST)
+            if password_form.is_valid():
+                user = password_form.save()
+                update_session_auth_hash(request, user)  # Keep user logged in
+                messages.success(request, 'Your password was updated successfully!')
+                return redirect('settings')
+            else:
+                messages.error(request, 'Please fix the errors in the password form.')
+
+        # 4. Clear Completed Tasks
+        elif action == 'clear_completed':
+            deleted_count, _ = StudyTask.objects.filter(
+                user=request.user,
+                status__in=['completed', 'done', 'COMPLETED', 'DONE']
+            ).delete()
+            messages.success(request, f'Cleared {deleted_count} completed study tasks.')
+            return redirect('settings')
+
+    context = {
+        'profile': profile,
+        'password_form': password_form,
+        'subjects_count': Subject.objects.filter(user=request.user).count(),
+        'completed_tasks_count': StudyTask.objects.filter(
+            user=request.user,
+            status__in=['completed', 'done', 'COMPLETED', 'DONE']
+        ).count(),
+        'total_tasks_count': StudyTask.objects.filter(user=request.user).count(),
+    }
+    return render(request, 'planner/settings.html', context)
 
 
 # ==================== SUBJECTS & TOPICS CRUD ====================
@@ -878,3 +942,31 @@ def forgot_password_view(request):
                         messages.error(request, err)
 
     return render(request, 'registration/forgot_password.html')
+
+@login_required
+def profile_view(request):
+    profile, _ = StudentProfile.objects.get_or_create(user=request.user)
+
+    if request.method == 'POST':
+        request.user.first_name = request.POST.get('first_name', '').strip()
+        request.user.last_name = request.POST.get('last_name', '').strip()
+        request.user.email = request.POST.get('email', '').strip()
+        request.user.save()
+
+        try:
+            goal = int(request.POST.get('daily_goal_minutes', 120))
+            profile.daily_goal_minutes = max(15, min(720, goal))
+        except ValueError:
+            profile.daily_goal_minutes = 120
+        profile.save()
+
+        messages.success(request, 'Profile updated successfully!')
+        return redirect('profile')
+
+    context = {
+        'profile': profile,
+        'subjects_count': Subject.objects.filter(user=request.user).count(),
+        'completed_tasks_count': StudyTask.objects.filter(user=request.user, status__in=['completed', 'done', 'COMPLETED', 'DONE']).count(),
+    }
+    return render(request, 'planner/profile.html', context)
+

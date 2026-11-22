@@ -56,4 +56,6 @@ urlpatterns = [
     path('subjects/<int:subject_pk>/calibrate/', views.apply_adaptive_estimate_view, name='apply_adaptive_estimate'),
 
     path('forgot-password/', views.forgot_password_view, name='forgot_password'),
+    path('profile/', views.profile_view, name='profile'),
+    path('settings/', views.settings_view, name='settings'),
 ]
